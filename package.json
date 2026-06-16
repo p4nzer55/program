@@ -1,0 +1,13 @@
+{
+  "name": "saas-helper-bot",
+  "version": "1.0.0",
+  "description": "SaaS安全运营客服智能问答机器人",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "keywords": ["saas", "security", "chatbot", "客服机器人"],
+  "author": "",
+  "license": "ISC"
+}

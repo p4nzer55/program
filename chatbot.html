@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SaaS Helper - 客服智能问答机器人</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Microsoft YaHei', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .chat-container {
+      width: 100%;
+      max-width: 800px;
+      height: 90vh;
+      max-height: 700px;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      margin-bottom: 5px;
+    }
+
+    .header p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      background: #f7f9fc;
+    }
+
+    .message {
+      margin-bottom: 16px;
+      display: flex;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message.user {
+      justify-content: flex-end;
+    }
+
+    .message.bot {
+      justify-content: flex-start;
+    }
+
+    .message-content {
+      max-width: 70%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .message.user .message-content {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.bot .message-content {
+      background: white;
+      color: #333;
+      border: 1px solid #e0e0e0;
+      border-bottom-left-radius: 4px;
+    }
+
+    .quick-questions {
+      padding: 15px 20px;
+      background: #fff;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .quick-btn {
+      padding: 8px 16px;
+      background: #f0f2f5;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #666;
+      transition: all 0.2s;
+    }
+
+    .quick-btn:hover {
+      background: #667eea;
+      color: white;
+    }
+
+    .input-area {
+      padding: 20px;
+      background: #fff;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-area input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 24px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-area input:focus {
+      border-color: #667eea;
+    }
+
+    .input-area button {
+      padding: 12px 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 24px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .input-area button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .input-area button:active {
+      transform: translateY(0);
+    }
+
+    .typing {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 12px 16px;
+    }
+
+    .typing span {
+      width: 8px;
+      height: 8px;
+      background: #999;
+      border-radius: 50%;
+      animation: typing 1.4s infinite;
+    }
+
+    .typing span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .typing span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes typing {
+      0%, 60%, 100% {
+        transform: translateY(0);
+        opacity: 0.4;
+      }
+      30% {
+        transform: translateY(-8px);
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="header">
+      <h1>🛡️ SaaS Helper</h1>
+      <p>安全运营客服智能问答机器人</p>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <div class="message bot">
+        <div class="message-content">
+          您好！我是 SaaS 安全运营客服机器人，很高兴为您服务。<br><br>
+          我可以帮您解答以下问题：<br>
+          1. 云监测接入流程<br>
+          2. 玄武盾防护管理<br>
+          3. 工单处理规范<br>
+          4. 问题排查<br><br>
+          请告诉我您需要什么帮助？
+        </div>
+      </div>
+    </div>
+
+    <div class="quick-questions">
+      <button class="quick-btn" onclick="sendQuickQuestion('云监测怎么接入？')">云监测怎么接入？</button>
+      <button class="quick-btn" onclick="sendQuickQuestion('403误拦截怎么办？')">403误拦截怎么办？</button>
+      <button class="quick-btn" onclick="sendQuickQuestion('防护模式有哪些？')">防护模式有哪些？</button>
+      <button class="quick-btn" onclick="sendQuickQuestion('平台网址是什么？')">平台网址是什么？</button>
+    </div>
+
+    <div class="input-area">
+      <input type="text" id="messageInput" placeholder="请输入您的问题..." onkeypress="handleKeyPress(event)">
+      <button onclick="sendMessage()">发送</button>
+    </div>
+  </div>
+
+  <script>
+    const knowledgeBase = {
+      greetings: {
+        keywords: ['你好', '您好', 'hi', 'hello', '嗨', '在吗'],
+        response: '您好！我是 SaaS 安全运营客服机器人，很高兴为您服务。\n\n我可以帮您解答以下问题：\n1. 云监测接入流程\n2. 玄武盾防护管理\n3. 工单处理规范\n4. 问题排查\n\n请告诉我您需要什么帮助？'
+      },
+      cloudMonitoring: {
+        keywords: ['云监测', '监测', '监控', '接入', '添加站点'],
+        response: '【云监测接入流程】\n\n1. 接入前准备：\n   - 需要客户填写《云监测网站环境调查表》\n   - 确认扫描授权书（若需要）\n   - 收集备案 IP 信息\n\n2. 接入流程：\n   - 申请阶段：客户提交云监测服务接入申请\n   - 配置阶段：在管理端添加监测站点、配置参数、确认合同\n   - 验证阶段：确认监测正常运行\n\n3. 功能操作：\n   - 导出监测自定义汇总报告（日报、月报、年报）\n   - 导出任意时间单站点监测报告\n   - 导出实时报告\n   - 制作脱敏报告模板\n   - 查看可视化大屏\n   - 平台登录密码修改/重置\n   - 安全事件告警查看\n   - 通过 URL/用户手机号码查询合同'
+      },
+      xuanwudun: {
+        keywords: ['玄武盾', 'waf', '防护', '防火墙', '云防护'],
+        response: '【玄武盾防护管理】\n\n防护模式：\n- 防护模式：开启全量防护\n- 检测模式：仅记录日志不拦截\n- 转发模式：仅转发流量不防护\n\n核心功能：\n1. 一键关停\n2. 永久在线（需先学习3天）\n3. 回源/回切\n4. 防扫描、防CC、访问控制\n\n更多功能详情请咨询具体问题。'
+      },
+      modeSwitch: {
+        keywords: ['模式', '切换', '防护模式', '检测模式', '转发模式'],
+        response: '【防护模式说明】\n\n- 防护模式：开启全量防护，拦截恶意攻击\n- 检测模式：仅记录日志不拦截，用于观察流量\n- 转发模式：仅转发流量不防护，相当于透明代理\n\n您可以根据实际需求在平台中切换相应模式。'
+      },
+      error403: {
+        keywords: ['403', '拦截', '误拦截', '禁止访问'],
+        response: '【403 拦截排查】\n\n出现 403 拦截时的处理步骤：\n1. 确认拦截时间点\n2. 查看访问日志\n3. 检查防护规则\n\n如果是正常业务被误拦截：\n1. 确认正常业务被误拦截\n2. 在 URL 级别或站点级别解封该防护策略\n3. 验证恢复正常访问\n4. 删除策略限制，恢复正常拦截功能'
+      },
+      error422: {
+        keywords: ['422', '端口', '未添加', '配置未生效'],
+        response: '【422 错误排查】\n\n422 错误表示访问了未添加的端口或端口配置未生效。\n\n解决方法：\n1. 检查站点配置的端口列表\n2. 确认端口是否已添加\n3. 如未添加，添加该端口或联系首席重新下发配置'
+      },
+      error5xx: {
+        keywords: ['500', '501', '502', '503', '504', '5xx', '服务器错误'],
+        response: '【5XX 错误排查】\n\n常见 5XX 错误原因：\n- 源站服务器故障\n- 网络连接问题\n- 配置错误\n\n建议参考《玄武盾 5XX 响应码及常见快速排障措施》文档进行详细排查。'
+      },
+      siteDown: {
+        keywords: ['无法访问', '站点打不开', '网站挂了', '访问不了'],
+        response: '【站点无法访问排查】\n\n1. 检查 DNS 解析是否正确\n2. 确认防护模式设置\n3. 查看访问日志\n4. 检查源站状态\n5. 如需临时回源，可开启回源站点功能\n\n如果问题仍未解决，请联系技术支持。'
+      },
+      ticket: {
+        keywords: ['工单', 'udesk', '400', '邮件', '投诉', '反馈'],
+        response: '【工单处理规范】\n\nUDESK 工单记录标准：\n- 记录工单时需包含完整的问题描述\n- 记录处理过程和结果\n- 分类标记工单类型\n\n400 坐席接听指南：\n- 按照标准话术接听电话\n- 详细记录客户问题\n- 及时跟进处理进度\n\n邮件告警服务器：\n- 地址：http://172.16.5.153:8089/web/sms/manual\n- 需连接萧山 VPN'
+      },
+      vpn: {
+        keywords: ['vpn', '萧山', 'vpn账号', 'vpn密码'],
+        response: '【萧山 VPN 信息】\n\n- 用户名：stormcenter\n- 密码：ujKqX34oM60DO8Gh\n\n⚠️ 注意：严禁外传！'
+      },
+      platform: {
+        keywords: ['平台', '网址', '网站', '链接', '地址', '登录'],
+        response: '【平台访问信息】\n\n- 公司官网：https://www.dbappsecurity.com.cn/\n- 云监测/云防护平台：https://www.websaas.cn\n- 邮件告警服务器：http://172.16.5.153:8089/web/sms/manual (需连接萧山 VPN)'
+      },
+      permanentOnline: {
+        keywords: ['永久在线', '学习模式', '镜像'],
+        response: '【永久在线功能】\n\n开启永久在线需要：\n1. 先开启学习模式\n2. 学习 3 天创建好镜像\n3. 然后才可打开永久在线功能\n\n开启后请观察站点状态并分析原因。'
+      },
+      backToSource: {
+        keywords: ['回源', '回切', '绕过', 'dns'],
+        response: '【回源/回切说明】\n\n- 回源站点：通过 DNS 完全绕过玄武盾，直接访问源站\n- 回切站点：通过 DNS 接入玄武盾，恢复防护\n\n注意：删除站点将引起业务故障，真实环境中需和客户得到有痕迹的确定方可删除。'
+      },
+      thanks: {
+        keywords: ['谢谢', '感谢', 'thanks', 'thank you'],
+        response: '不客气！很高兴能帮到您。如果还有其他问题，随时可以问我。'
+      },
+      bye: {
+        keywords: ['再见', '拜拜', 'bye', 'goodbye'],
+        response: '再见！祝您工作顺利，有问题随时再来咨询！'
+      }
+    };
+
+    function getResponse(userInput) {
+      const input = userInput.toLowerCase();
+
+      for (const [key, item] of Object.entries(knowledgeBase)) {
+        if (item.keywords.some(keyword => input.includes(keyword.toLowerCase()))) {
+          return item.response;
+        }
+      }
+
+      return '抱歉，我暂时无法理解您的问题。您可以尝试询问以下方面：\n\n- 云监测接入流程\n- 玄武盾防护管理\n- 403/422/5XX 错误排查\n- 工单处理\n- 平台访问\n\n或者重新描述您的问题，我会尽力为您解答！';
+    }
+
+    const chatMessages = document.getElementById('chatMessages');
+    const messageInput = document.getElementById('messageInput');
+
+    function addMessage(content, isUser) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'message ' + (isUser ? 'user' : 'bot');
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'message-content';
+      contentDiv.textContent = content;
+      messageDiv.appendChild(contentDiv);
+      chatMessages.appendChild(messageDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function showTyping() {
+      const typingDiv = document.createElement('div');
+      typingDiv.className = 'message bot';
+      typingDiv.id = 'typing';
+      typingDiv.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+      chatMessages.appendChild(typingDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function removeTyping() {
+      const typing = document.getElementById('typing');
+      if (typing) typing.remove();
+    }
+
+    function sendMessage() {
+      const message = messageInput.value.trim();
+      if (!message) return;
+
+      addMessage(message, true);
+      messageInput.value = '';
+
+      showTyping();
+
+      setTimeout(function() {
+        removeTyping();
+        const response = getResponse(message);
+        addMessage(response, false);
+      }, 600);
+    }
+
+    function sendQuickQuestion(question) {
+      messageInput.value = question;
+      sendMessage();
+    }
+
+    function handleKeyPress(event) {
+      if (event.key === 'Enter') {
+        sendMessage();
+      }
+    }
+
+    messageInput.focus();
+  </script>
+</body>
+</html>

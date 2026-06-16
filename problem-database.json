@@ -1,0 +1,726 @@
+{
+  "problems": [
+    {
+      "id": "error_504",
+      "category": "HTTP错误码",
+      "keywords": [
+        "504",
+        "超时",
+        "网关超时",
+        "无法连接"
+      ],
+      "question": "出现504错误怎么办？",
+      "answer": "【504错误排查】\n\n含义：无法连接到源站，由Nginx发出响应码\n\n原因：\n- telnet不可达，如IP被源站屏蔽，或源站业务自身异常\n- 网络异常\n- 源站IP被玄武盾防火墙丢包（小概率事件）\n- 连通性没有问题，但请求过大导致的超时（默认60秒）\n- HTTPS握手阶段出现问题（仅HTTPS）\n\n处理方法：\n1)源站TCP连接故障，如端口不通\n2)源站TCP连接正常，但部分请求（常见为POST请求）耗时过长导致的504\n3)源站TCP连接正常，但因对端安全设备丢弃连接导致的504\n4)网络异常\n\n防护模式：\n- 白名单IP地址或URL，HAProxy无法连接到源站\n- 源站多个地址均不可达\n\n转发模式：\n- HAProxy无法连接到源站，和防护模式下的504同义\n\n其他场景：\n- Nginx配置未下发，或已下发但未生效\n- 请在对应节点查看nginx进程启动时间，如出现较为明显的时间差，请升级到二线处理",
+      "priority": 5,
+      "frequency": 1,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2026-06-16T03:20:56.567Z"
+    },
+    {
+      "id": "error_403",
+      "category": "HTTP错误码",
+      "keywords": [
+        "403",
+        "禁止访问",
+        "拦截"
+      ],
+      "question": "出现403错误怎么办？",
+      "answer": "【403错误排查】\n\n被云防护安全策略拦截\n\n建议用户点击下方的反馈误报。\n\n在【运营工具】-【误报反馈】中查看分析对应误报：\n- 如果疑似攻击则继续拦截，点【不处理】并添加继续拦截的备注\n- 如果分析是误报，则做【url规则禁用】或【站点级规则禁用】\n\n如果无法通过误报反馈的方式提交误报：\n1. 查询对应站点的攻击日志，被拦截响应码为403\n2. 在【安全运营】-【防护策略】中搜索对应策略ID\n3. 配置站点级或者url级禁用\n\n若攻击日志对应的策略ID为15010052，则在【站点配置】-【webshell白名单】进行添加处理。",
+      "priority": 5,
+      "frequency": 1,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2026-06-16T03:24:47.340Z"
+    },
+    {
+      "id": "error_503",
+      "category": "HTTP错误码",
+      "keywords": [
+        "503",
+        "服务不可用"
+      ],
+      "question": "出现503错误怎么办？",
+      "answer": "【503错误排查】\n\n原因：\n1)转发模式或访问控制白名单时，参考上述504部分\n2)云防护部分节点配置未下发或未更新完毕",
+      "priority": 4,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "error_502",
+      "category": "HTTP错误码",
+      "keywords": [
+        "502",
+        "网关错误",
+        "bad gateway"
+      ],
+      "question": "出现502错误怎么办？",
+      "answer": "【502错误排查】\n\n原因：\n1. 云防护节点被客户本地安全设备拦截，重点查本地WAF七层安全设备\n2. SNI头配置没开\n3. 单个请求出现502，大概率是本地安全设备拦截了单个请求\n\n使用排查工具：\n1. telnet测试全部不通 - 源站业务有问题\n2. telnet测试部分节点到客户源站不通 - 判断是本地安全设备有拦截这些节点IP地址段\n3. telnet全通，curl全部不通 - 源站业务有问题或SNI没开\n4. telnet全通，curl部分不通 - 判断是本地安全设备如waf有拦截这些节点IP地址段\n\n开启SNI：\n- 没有关联节点是本地节点无法测（找负责人）",
+      "priority": 5,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "error_500",
+      "category": "HTTP错误码",
+      "keywords": [
+        "500",
+        "服务器内部错误"
+      ],
+      "question": "出现500错误怎么办？",
+      "answer": "【500错误排查】\n\n500忽略，查看对应的403日志即可\n\n原因：\n- POST请求不符合RFC规范\n- 网站配置中出现了IPv6地址但所在防护节点只有IPv4的场景，部分防护节点网卡上只有IPv6私网地址时，也会出现\n\n处理方法：\n请查看对应站点配置中是否存在IPv6，如存在则删除该配置",
+      "priority": 4,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "error_405",
+      "category": "HTTP错误码",
+      "keywords": [
+        "405",
+        "不允许",
+        "请求方法"
+      ],
+      "question": "出现405错误怎么办？",
+      "answer": "【405错误排查】\n\n客户端尝试使用服务器不支持的请求方法（如对只允许GET的接口发送POST请求）访问资源。",
+      "priority": 3,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "error_404",
+      "category": "HTTP错误码",
+      "keywords": [
+        "404",
+        "找不到",
+        "不存在"
+      ],
+      "question": "出现404错误怎么办？",
+      "answer": "【404错误排查】\n\n源站开启了永久在线功能，访问到镜像站没学习到的资源时，会出现此状态码\n\n基本都为源站问题，建议用户排查源站，或者是存在扫描行为",
+      "priority": 3,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "error_401",
+      "category": "HTTP错误码",
+      "keywords": [
+        "401",
+        "未授权",
+        "认证"
+      ],
+      "question": "出现401错误怎么办？",
+      "answer": "【401错误排查】\n\n需要输入对端服务器定义之账号密码",
+      "priority": 2,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "error_400",
+      "category": "HTTP错误码",
+      "keywords": [
+        "400",
+        "错误请求"
+      ],
+      "question": "出现400错误怎么办？",
+      "answer": "【400错误排查】\n\n原因：\n1. 源站Web服务器（如Nginx、Apache）因接收到格式异常的请求（如超长URL、非法字符、畸形Header）而自行返回400\n2. 玄武盾开启HTTP安全响应头配置或精细化访问控制后，对请求头/参数进行校验，但该类策略默认不返回400，而是触发拦截并返回403或执行挑战\n3. 若客户配置了TLS协议版本限制（如仅允许TLS 1.2），而客户端使用不兼容的TLS版本发起HTTPS请求，部分源站或中间件可能返回400\n4. 玄武盾支持的协议和端口范围有限，若请求使用了不支持的非标端口或协议组合（如HTTP协议走443端口），源站可能因协议协商失败返回400\n\n常见情况：\n1. 请求头中Host字段未携带端口号（例如网站接入HTTPS但请求头Host缺少:443），尤其在检测或防护模式下会触发校验失败\n2. 客户端使用了玄武盾不支持的HTTP方法（默认仅放行GET和POST，其余方法如PUT、DELETE等会被拦截）\n3. 网站通过反向代理访问时，前侧代理未正确设置Host头，导致玄武盾校验不通过\n4. 若用户在云防护平台配置站点时协议（HTTP/HTTPS）与实际访问协议不一致（如配置HTTPS但用HTTP访问），也可能返回400\n\n检查：\n1. 是否启用了Host头必须携带端口号校验规则（常见于微信支付回调等场景）\n2. 是否在站点配置中错误启用了HTTPS-SNI选项但源站未正确配置SNI支持",
+      "priority": 5,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "error_422",
+      "category": "HTTP错误码",
+      "keywords": [
+        "422",
+        "端口未添加",
+        "配置未生效"
+      ],
+      "question": "出现422错误怎么办？",
+      "answer": "【422错误排查】\n\n云防护节点没有这个站点的端口配置，需要检查客户访问的端口是否正确",
+      "priority": 4,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "error_421",
+      "category": "HTTP错误码",
+      "keywords": [
+        "421",
+        "站点关停"
+      ],
+      "question": "出现421错误怎么办？",
+      "answer": "【421错误排查】\n\n云防护平台操作关停了站点",
+      "priority": 3,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "error_420",
+      "category": "HTTP错误码",
+      "keywords": [
+        "420",
+        "IP黑名单",
+        "拉黑",
+        "区域访问控制"
+      ],
+      "question": "出现420错误怎么办？",
+      "answer": "【420错误排查】\n\n访问控制手动拉黑的客户访问IP（查看黑名单）\n\n可能原因：\n1. 访问控制手动拉黑了客户访问IP\n2. 云端智能防扫描自动封禁了客户访问IP\n3. 域名开启了区域访问控制功能\n\n处理方法：\n在【安全运营】-【访问控制】中查看黑名单，确认IP是否被拉黑，解除黑名单即可。",
+      "priority": 4,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "phone_query",
+      "category": "服务支持",
+      "keywords": [
+        "电话",
+        "400",
+        "热线",
+        "客服电话"
+      ],
+      "question": "客服电话是多少？",
+      "answer": "【客服电话查询】\n\n1号线 - 售前问题处置\n2号线 - 安恒云SAAS服务处置（我们负责这个）\n3号线 - 天池、硬件设备（如防火墙、堡垒机、日志审计、APT等）\n\n注意：非云监测和云防护业务的重播400转3号线",
+      "priority": 3,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "access_slow",
+      "category": "访问问题",
+      "keywords": [
+        "慢",
+        "卡",
+        "响应慢",
+        "加载慢",
+        "访问很慢"
+      ],
+      "question": "访问网站很慢怎么办？",
+      "answer": "【访问网站很慢排查】\n\n1. 使用网络拨测工具https://boce.aliyun.com/detect/http检测状态和响应时间是否正常\n\n【排错方法】\n\n测试不过玄武盾访问是否存在相同现象，可以通过本地绑host的方式进行测试\n\n多台终端做访问测试，排除单台终端或者单个网络情况的影响。具体可参考www.17ce.com的测试结果\n\n访问网站时使用F12抓包分析，查看是否有个别URL访问异常：\n(1) 个别URL需要访问其他端口，且端口玄武盾未做接入，解决方法将端口加入玄武盾平台\n(2) 个别URL存在被玄武盾拦截返回403的情况，解决方法参考\"排障篇（四）\"\n(3) 个别资源图片、视频过大导致加载时间过长导致，可开启\"gzip传输\"\n\n确认Tq（第1个）时间是否比较大，排查客户端IP线路与玄武盾线路是否畅通\n\n查看ha日志，确认服务器端口是非57980、57981的源站端口，还是为57980、57981的nginx端口：\n- 排查是否nginx问题，可开转发模式\n- 若为nginx问题，继续排查lb主机与nginx是否畅通\n- 一般为内网可以忽略；另外短连接会对服务器压力有一定影响\n\n确认Tr（第4个）时间是否比较大：\n(1) 排查玄武盾与服务器端线路是否畅通\n(2) 排查服务器是否过载\n\n如果改为转发仍访问慢：\n- 将问题升级至冯宇琛处\n- 如冯宇琛处理未果，则继续将问题上升至400负责人处（需在接到问题的当天完成）",
+      "priority": 5,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "site_not_added",
+      "category": "接入问题",
+      "keywords": [
+        "未接入",
+        "未配置",
+        "提示未接入玄武盾"
+      ],
+      "question": "访问站点出现未接入玄武盾提示？",
+      "answer": "【未接入玄武盾提示排查】\n\n【排查步骤】\n1. 确认出现该页面的域名及端口，检查玄武盾平台上是否添加了该站点及端口\n2. 如平台有该域名及端口，则将问题上升至冯宇琛处，检查对应节点的配置是否成功下发（概率很低，常见于非自建节点）",
+      "priority": 4,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "site_stopped",
+      "category": "接入问题",
+      "keywords": [
+        "站点关停",
+        "关停页面",
+        "站点停止"
+      ],
+      "question": "出现了站点关停页面？",
+      "answer": "【站点关停页面排查】\n\n【排查步骤】\n1. 检查玄武盾平台上站点是否关停\n2. 如平台上站点未关停，则将问题上升至冯宇琛处，检查对应节点的站点开启配置是否成功下发（概率很低，常见于非自建节点）",
+      "priority": 4,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "blocked",
+      "category": "拦截问题",
+      "keywords": [
+        "被拦截",
+        "提示被玄武盾拦截"
+      ],
+      "question": "提示被玄武盾拦截？",
+      "answer": "【被玄武盾拦截排查】\n\n【排查步骤】\n建议用户点击下方的反馈误报。\n\n1. 在【运营工具】-【误报反馈】中查看分析对应误报\n   - 如果疑似攻击则继续拦截，点【不处理】并添加继续拦截的备注\n   - 如果分析是误报，则做【url规则禁用】或【站点级规则禁用】\n\n2. 如果无法通过误报反馈的方式提交误报，则查询对应站点的攻击日志，被拦截响应码为403\n   - 在【安全运营】-【防护策略】中搜索对应策略ID\n   - 配置站点级或者url级禁用\n\n3. 若攻击日志对应的策略ID为15010052，则在【站点配置】-【webshell白名单】进行添加处理",
+      "priority": 5,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "ip_blocked",
+      "category": "拦截问题",
+      "keywords": [
+        "IP被限制",
+        "IP被封禁",
+        "IP黑名单",
+        "管理员限制"
+      ],
+      "question": "IP被管理员限制了怎么办？",
+      "answer": "【IP被管理员限制排查】\n\n【排查步骤】\n\n1. 首先获取用户端真实的公网IP地址\n   - 用户端IP获取可以让用户访问www.ipip.net查看\n   - 但会存在流量穿透等情况\n   - 可以让用户访问站点加/1.mdb通过拦截页面来获取客户端IP地址\n\n2. 检查访问IP是否为黑名单IP，或确认XFF是否携带了黑名单IP\n   - 具体在【安全运营】-【访问控制】中搜索该IP\n   - 然后将该IP删除即可\n\n3. 检查站点是否做了区域访问控制，用户访问IP是否为所限制区域\n   - 具体在【站点信息】-右侧【配置】-【访问控制】中查看区域访问控制的配置",
+      "priority": 4,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "availability_alert",
+      "category": "告警问题",
+      "keywords": [
+        "告警",
+        "短信",
+        "邮件",
+        "可用性告警"
+      ],
+      "question": "收到可用性告警短信或邮件？",
+      "answer": "【可用性告警排查】\n\n告警触发机制为1分钟内5XX/total超过设置的可用性告警阈值\n\ntotal指该时段内总的访问量\n\n主要去查询分析短信所示的时间点是否满足告警条件",
+      "priority": 3,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "no_site_info",
+      "category": "登录问题",
+      "keywords": [
+        "看不到站点",
+        "看不到信息",
+        "站点信息",
+        "登录"
+      ],
+      "question": "登录玄武盾，看不到站点信息？",
+      "answer": "【登录看不到站点信息排查】\n\n处理步骤：\n\n1. 先获取用户登录账号（即手机号）\n2. 在菜单最下方的运营工具-用户端跳转处搜索该账号\n3. 点击跳转\n4. 在云防护的站点管理中先查看站点是否存在\n\n若站点不存在：\n- 在管理端的系统管理-用户管理中查看该用户是什么角色\n- 是合同用户则需要在合同与客户-合同管理中在指定合同下将该用户添加到合同联系人\n- 站点用户则需要在用户管理中点击该用户右侧的关注站点\n\n【用户类型说明】\n- 合同用户：整个合同下的所有网站都可以管理\n- 站点用户：只能管理该用户关注过的网站，根据情况配置为可读或可编辑",
+      "priority": 4,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "site_issue_no_log",
+      "category": "访问问题",
+      "keywords": [
+        "网站使用有问题",
+        "kibana",
+        "日志无异常",
+        "5xx"
+      ],
+      "question": "网站使用有问题，但kibana上的日志响应码无异常？",
+      "answer": "【日志无异常但网站有问题排查】\n\n异常响应码指5xx\n\n【排查步骤】\n1. 确认域名解析是否正常\n2. 索要客户端出口IP，与吴立勋确认是否被DDOS拉黑\n3. 打开云防护服务-高级威胁-防扫描/CC，确认IP是否被封禁\n4. 打开云防护服务-安全运营-访问控制，确认域名或IP是否被拉黑\n5. 找冯宇琛\n6. 找冯宇琛未果，找400负责人",
+      "priority": 4,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "report_export",
+      "category": "功能操作",
+      "keywords": [
+        "报告",
+        "导出",
+        "云防护报告"
+      ],
+      "question": "如何导出云防护报告？",
+      "answer": "【云防护报告导出】\n\n处理步骤：\n1. 确认信息（单日还是汇总）\n2. 报告导出",
+      "priority": 3,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "whitelist_blocking",
+      "category": "功能操作",
+      "keywords": [
+        "加白",
+        "放行",
+        "白名单",
+        "封禁"
+      ],
+      "question": "如何加白和放行拦截？",
+      "answer": "【加白和放行拦截】\n\n处理原则：先加白后封禁\n\n操作步骤：\n- 时长看客户要求，默认是永久\n- 备注是客户要求\n- 白名单生效需要5分钟左右",
+      "priority": 4,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "blacklist",
+      "category": "功能操作",
+      "keywords": [
+        "黑名单",
+        "封禁",
+        "IP封禁"
+      ],
+      "question": "如何设置黑名单封禁？",
+      "answer": "【黑名单封禁设置】\n\n- 不填IP就是全IP地址封禁",
+      "priority": 3,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "account_open",
+      "category": "账号管理",
+      "keywords": [
+        "账号开通",
+        "开通账号",
+        "玄武盾账号"
+      ],
+      "question": "如何开通玄武盾账号？",
+      "answer": "【玄武盾账号开通】\n\n处理步骤：\n1. 查询信息（看是否有合同）\n2. 提供手机号、姓名和邮箱\n3. 开通账户\n4. 合同关联已有联系人\n5. 站点配置告警联系人\n\n注意：必须要有邮箱",
+      "priority": 4,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "dns_check",
+      "category": "接入问题",
+      "keywords": [
+        "DNS解析",
+        "cname",
+        "A记录"
+      ],
+      "question": "如何查看DNS解析是否经过玄武盾？",
+      "answer": "【DNS解析检查】\n\n【排查步骤】\n\n1. cmd下nslookup +域名观察是否解析到对应的cname\n   - 同时确认IP地址是否为玄武盾地址\n   - 服务器可以通过提取X-Forwarded-For字段获取真实的访问源IP\n\n2. 域名后面加/1.mdb测试是否被玄武盾拦截\n\nIP解析还在源站：需要添加站点",
+      "priority": 4,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "add_site",
+      "category": "接入问题",
+      "keywords": [
+        "添加站点",
+        "新建站点"
+      ],
+      "question": "如何添加站点？",
+      "answer": "【添加站点流程】\n\n处理步骤：\n\n1. 提供一下ssl证书（nginx版本的）\n2. 站点建立后，发送客户cname\n3. 本地电脑测试在自己电脑的hosts文件写一条解析记录\n4. DNS解析页面刷新\n\n站点改为https加密：\n- 查看端口是否在白名单中，如果不在找相关地区人员\n\n玄武盾临时关闭（DNS改为A记录）：\n- 同理做cname解析需要将原来的A记录删除\n\n已经改回源站：需要重新添加站点（端口）\n\n【端口说明】\n- http默认80，https默认443\n- 证书pem改为crt\n- 没有特殊要求都是默认\n\n【注意事项】\n- IPV6授权不允许\n- 源站是否有v6地址，是否有购买云防护v6转换服务",
+      "priority": 5,
+      "frequency": 1,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2026-06-16T03:24:58.388Z"
+    },
+    {
+      "id": "cc_scan_query",
+      "category": "功能操作",
+      "keywords": [
+        "防cc",
+        "防扫描",
+        "查询",
+        "告警规则"
+      ],
+      "question": "如何查询防cc/扫描告警规则？",
+      "answer": "【防cc/扫描查询】\n\n云端智能查询告警规则\n\n目前配置的是一分钟攻击超过50次自动封禁3小时",
+      "priority": 3,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "log_query",
+      "category": "功能操作",
+      "keywords": [
+        "查询日志",
+        "日志",
+        "客户端日志"
+      ],
+      "question": "如何查询日志？",
+      "answer": "【日志查询】\n\n询问IP地址\n查询日志\n\n客户端查询日志需要用户提供具体信息",
+      "priority": 3,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "renewal",
+      "category": "合同管理",
+      "keywords": [
+        "延期",
+        "续保",
+        "续签",
+        "合同"
+      ],
+      "question": "如何处理合同延期/续保？",
+      "answer": "【合同延期/续保】\n\n查延期：找地区负责人\n\n合同续保：联系运营经理\n\n合同续签：更改合同",
+      "priority": 3,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "blacklist_unblock",
+      "category": "功能操作",
+      "keywords": [
+        "黑名单解封",
+        "解除封禁",
+        "解封"
+      ],
+      "question": "如何解封黑名单？",
+      "answer": "【黑名单解封】\n\n处理步骤：\n1. 确认身份\n2. 删除条目",
+      "priority": 3,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "node_whitelist",
+      "category": "配置管理",
+      "keywords": [
+        "节点白名单",
+        "dbwaf"
+      ],
+      "question": "节点白名单汇总？",
+      "answer": "【节点白名单汇总】\n\ndbwaf - 白名单配置\n\n相关文件：\n- dbwaf-whitelist-xxx.txt (WAF节点白名单)\n- dbmonitor-whitelist-xxx.txt (云监测白名单)",
+      "priority": 2,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "non_standard_contract",
+      "category": "合同管理",
+      "keywords": [
+        "非标合同",
+        "非标"
+      ],
+      "question": "什么是非标合同？",
+      "answer": "【非标合同说明】\n\n非标合同需要查看客户合同，看是否是安恒新功能节点（即非标）\n\n特征：\n- 非标在http白名单中\n- 不在https白名单中",
+      "priority": 2,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "websocket",
+      "category": "功能操作",
+      "keywords": [
+        "websocket",
+        "ws",
+        "长连接"
+      ],
+      "question": "支持websocket功能吗？",
+      "answer": "【WebSocket功能】\n\n玄武盾支持WebSocket功能，需要专门配置",
+      "priority": 3,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "change_certificate",
+      "category": "功能操作",
+      "keywords": [
+        "更改证书",
+        "更换证书",
+        "SSL证书"
+      ],
+      "question": "如何更改SSL证书？",
+      "answer": "【更改SSL证书】\n\n需要提供新的证书文件（nginx版本的）\n\n证书说明：\n- pem格式改为crt格式\n- 更新后需要重启相关服务",
+      "priority": 4,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "vulnerability_report",
+      "category": "报告管理",
+      "keywords": [
+        "云漏扫报告",
+        "漏扫报告",
+        "漏洞扫描"
+      ],
+      "question": "云漏扫报告如何处理？",
+      "answer": "【云漏扫报告】\n\n1. 云漏扫报告生成\n2. 报告审核\n\n需要专业人员进行报告审核和分析",
+      "priority": 3,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "smart_scan",
+      "category": "功能操作",
+      "keywords": [
+        "智能防扫描",
+        "防扫描",
+        "扫描防护"
+      ],
+      "question": "智能防扫描功能是什么？",
+      "answer": "【智能防扫描】\n\n云端智能防扫描功能\n\n配置规则：\n- 目前配置的是一分钟攻击超过50次自动封禁3小时",
+      "priority": 3,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "change_source_ip",
+      "category": "配置管理",
+      "keywords": [
+        "修改源站ip",
+        "更改源站",
+        "源站IP"
+      ],
+      "question": "如何修改源站IP？",
+      "answer": "【修改源站IP】\n\n在站点配置中修改源站IP地址\n\n修改后需要检查：\n1. 新源站IP是否可达\n2. 端口配置是否正确\n3. 是否需要同步DNS配置",
+      "priority": 4,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "regional_access_control",
+      "category": "功能操作",
+      "keywords": [
+        "区域访问控制",
+        "地区控制",
+        "地域限制"
+      ],
+      "question": "如何配置区域访问控制？",
+      "answer": "【区域访问控制】\n\n在站点配置中设置区域访问控制\n\n配置路径：\n站点信息 - 右侧配置 - 访问控制\n\n可以选择允许或拒绝特定地区的访问",
+      "priority": 3,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "site_limit",
+      "category": "配置管理",
+      "keywords": [
+        "站点数量",
+        "可添加站点数量",
+        "站点限制"
+      ],
+      "question": "如何查看可添加站点数量？",
+      "answer": "【站点数量限制】\n\n在站点管理中可以查看当前已添加站点数量和可添加站点数量\n\n根据合同类型限制可添加站点数量",
+      "priority": 2,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "non_standard_port",
+      "category": "配置管理",
+      "keywords": [
+        "非标端口",
+        "特殊端口",
+        "其他端口"
+      ],
+      "question": "如何添加非标端口？",
+      "answer": "【非标端口添加】\n\n处理步骤：\n\n1. 先用标准的端口加，加到非标合同\n2. 再由负责人改端口\n\n注意：试用合同只能接标准端口",
+      "priority": 4,
+      "frequency": 0,
+      "success_rate": 0,
+      "feedback": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "categories": [
+    "HTTP错误码",
+    "服务支持",
+    "访问问题",
+    "接入问题",
+    "拦截问题",
+    "告警问题",
+    "登录问题",
+    "功能操作",
+    "账号管理",
+    "合同管理",
+    "配置管理",
+    "报告管理"
+  ],
+  "metadata": {
+    "version": "1.0",
+    "created_at": "2024-06-16T00:00:00Z",
+    "last_updated": "2026-06-16T03:24:58.389Z",
+    "total_problems": 41,
+    "total_categories": 12
+  }
+}

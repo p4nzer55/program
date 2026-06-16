@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SaaS Helper - 客服智能问答机器人</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Microsoft YaHei', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .chat-container {
+      width: 100%;
+      max-width: 900px;
+      height: 90vh;
+      max-height: 750px;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      text-align: center;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      font-size: 22px;
+      margin-bottom: 3px;
+    }
+
+    .header p {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .header-stats {
+      text-align: right;
+      font-size: 12px;
+      opacity: 0.85;
+    }
+
+    .header-stats span {
+      display: block;
+      margin: 2px 0;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      background: #f7f9fc;
+    }
+
+    .message {
+      margin-bottom: 16px;
+      display: flex;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message.user {
+      justify-content: flex-end;
+    }
+
+    .message.bot {
+      justify-content: flex-start;
+    }
+
+    .message-content {
+      max-width: 70%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      position: relative;
+    }
+
+    .message.user .message-content {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.bot .message-content {
+      background: white;
+      color: #333;
+      border: 1px solid #e0e0e0;
+      border-bottom-left-radius: 4px;
+    }
+
+    .message-meta {
+      font-size: 10px;
+      color: #999;
+      margin-top: 4px;
+    }
+
+    .feedback-buttons {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #f0f0f0;
+    }
+
+    .feedback-btn {
+      padding: 4px 10px;
+      border: 1px solid #ddd;
+      background: white;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 12px;
+      color: #666;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .feedback-btn:hover {
+      background: #f5f5f5;
+    }
+
+    .feedback-btn.positive:hover {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border-color: #2e7d32;
+    }
+
+    .feedback-btn.negative:hover {
+      background: #ffebee;
+      color: #c62828;
+      border-color: #c62828;
+    }
+
+    .feedback-btn.active {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .feedback-btn.thumbs-up {
+      color: #2e7d32;
+    }
+
+    .feedback-btn.thumbs-down {
+      color: #c62828;
+    }
+
+    .feedback-btn.thumbs-up:hover {
+      background: #e8f5e9;
+      color: #1b5e20;
+    }
+
+    .feedback-btn.thumbs-down:hover {
+      background: #ffebee;
+      color: #b71c1c;
+    }
+
+    .category-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #e3f2fd;
+      color: #1565c0;
+      border-radius: 4px;
+      font-size: 11px;
+      margin-bottom: 6px;
+    }
+
+    .quick-questions {
+      padding: 12px 20px;
+      background: #fff;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+
+    .quick-btn {
+      padding: 6px 14px;
+      background: #f0f2f5;
+      border: none;
+      border-radius: 16px;
+      cursor: pointer;
+      font-size: 12px;
+      color: #666;
+      transition: all 0.2s;
+    }
+
+    .quick-btn:hover {
+      background: #667eea;
+      color: white;
+    }
+
+    .input-area {
+      padding: 16px 20px;
+      background: #fff;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-area input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 24px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-area input:focus {
+      border-color: #667eea;
+    }
+
+    .input-area button {
+      padding: 12px 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 24px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .input-area button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .input-area button:active {
+      transform: translateY(0);
+    }
+
+    .typing {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 12px 16px;
+    }
+
+    .typing span {
+      width: 8px;
+      height: 8px;
+      background: #999;
+      border-radius: 50%;
+      animation: typing 1.4s infinite;
+    }
+
+    .typing span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .typing span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes typing {
+      0%, 60%, 100% {
+        transform: translateY(0);
+        opacity: 0.4;
+      }
+      30% {
+        transform: translateY(-8px);
+        opacity: 1;
+      }
+    }
+
+    .stats-panel {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 280px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      display: none;
+      z-index: 1000;
+    }
+
+    .stats-panel.show {
+      display: block;
+    }
+
+    .stats-header {
+      padding: 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-radius: 12px 12px 0 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .stats-header h3 {
+      font-size: 16px;
+    }
+
+    .stats-header .close-btn {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .stats-content {
+      padding: 16px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .stat-item:last-child {
+      border-bottom: none;
+    }
+
+    .stat-label {
+      color: #666;
+      font-size: 13px;
+    }
+
+    .stat-value {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .suggestion-item {
+      padding: 10px;
+      background: #fff3e0;
+      border-left: 3px solid #ff9800;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .suggestion-type {
+      font-weight: 600;
+      color: #e65100;
+      margin-bottom: 4px;
+    }
+
+    .top-questions {
+      margin-top: 12px;
+    }
+
+    .top-questions h4 {
+      font-size: 14px;
+      margin-bottom: 8px;
+      color: #333;
+    }
+
+    .top-question-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 12px;
+    }
+
+    .top-question-q {
+      color: #555;
+      flex: 1;
+      margin-right: 8px;
+    }
+
+    .top-question-count {
+      color: #667eea;
+      font-weight: 600;
+    }
+
+    .toggle-stats-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: white;
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+      cursor: pointer;
+      font-size: 18px;
+      z-index: 999;
+      transition: all 0.2s;
+    }
+
+    .toggle-stats-btn:hover {
+      transform: scale(1.1);
+    }
+
+    .success-toast {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #4caf50;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 24px;
+      font-size: 14px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      animation: slideUp 0.3s ease;
+      z-index: 1000;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+  </style>
+</head>
+<body>
+  <button class="toggle-stats-btn" onclick="toggleStats()" title="查看优化统计">📊</button>
+
+  <div class="stats-panel" id="statsPanel">
+    <div class="stats-header">
+      <h3>📊 系统优化统计</h3>
+      <button class="close-btn" onclick="toggleStats()">×</button>
+    </div>
+    <div class="stats-content" id="statsContent">
+      <div class="stat-item">
+        <span class="stat-label">总查询次数</span>
+        <span class="stat-value" id="totalQueries">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">总反馈次数</span>
+        <span class="stat-value" id="totalFeedbacks">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">知识库问题数</span>
+        <span class="stat-value" id="totalProblems">35</span>
+      </div>
+
+      <div class="top-questions">
+        <h4>🔥 高频问题</h4>
+        <div id="topQuestionsList"></div>
+      </div>
+
+      <div class="top-questions">
+        <h4>💡 优化建议</h4>
+        <div id="suggestionsList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chat-container">
+    <div class="header">
+      <div>
+        <h1>🛡️ SaaS Helper</h1>
+        <p>安全运营客服智能问答机器人（支持自优化）</p>
+      </div>
+      <div class="header-stats">
+        <span>✓ 智能匹配</span>
+        <span>✓ 反馈学习</span>
+        <span id="sessionStats">本会话: 0 查询</span>
+      </div>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <div class="message bot">
+        <div class="message-content">
+          您好！我是 SaaS 安全运营客服机器人，很高兴为您服务。<br><br>
+          我可以帮您解答以下问题：<br>
+          1. HTTP错误码（502、503、504、500、403、404等）<br>
+          2. 玄武盾防护管理<br>
+          3. 云防护接入流程<br>
+          4. 访问问题排查<br>
+          5. 功能操作（报告导出、加白、封禁等）<br>
+          6. 账号和合同管理<br><br>
+          请告诉我您需要什么帮助？
+        </div>
+      </div>
+    </div>
+
+    <div class="quick-questions">
+      <button class="quick-btn" onclick="sendQuickQuestion('504错误怎么办？')">504错误怎么办？</button>
+      <button class="quick-btn" onclick="sendQuickQuestion('403被拦截了？')">403被拦截了？</button>
+      <button class="quick-btn" onclick="sendQuickQuestion('访问网站很慢？')">访问网站很慢？</button>
+      <button class="quick-btn" onclick="sendQuickQuestion('如何添加站点？')">如何添加站点？</button>
+      <button class="quick-btn" onclick="sendQuickQuestion('IP被黑名单限制了？')">IP被黑名单限制了？</button>
+      <button class="quick-btn" onclick="sendQuickQuestion('云防护报告导出？')">云防护报告导出？</button>
+    </div>
+
+    <div class="input-area">
+      <input type="text" id="messageInput" placeholder="请输入您的问题..." onkeypress="handleKeyPress(event)">
+      <button onclick="sendMessage()">发送</button>
+    </div>
+  </div>
+
+  <script>
+    const chatMessages = document.getElementById('chatMessages');
+    const messageInput = document.getElementById('messageInput');
+    const statsPanel = document.getElementById('statsPanel');
+    const sessionStats = document.getElementById('sessionStats');
+
+    let sessionQueryCount = 0;
+    let lastQueryId = null;
+
+    function addMessage(content, isUser, metadata = {}) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'message ' + (isUser ? 'user' : 'bot');
+      messageDiv.id = metadata.messageId || '';
+
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'message-content';
+
+      // 添加分类标签
+      if (metadata.category) {
+        const categoryTag = document.createElement('span');
+        categoryTag.className = 'category-tag';
+        categoryTag.textContent = metadata.category;
+        contentDiv.appendChild(categoryTag);
+        contentDiv.appendChild(document.createElement('br'));
+      }
+
+      contentDiv.appendChild(document.createTextNode(content));
+
+      // 添加反馈按钮
+      if (!isUser && metadata.hasFeedback && metadata.queryId) {
+        const feedbackDiv = document.createElement('div');
+        feedbackDiv.className = 'feedback-buttons';
+        feedbackDiv.innerHTML = `
+          <button class="feedback-btn thumbs-up" onclick="submitFeedback('${metadata.queryId}', 1, this)">
+            👍 有用
+          </button>
+          <button class="feedback-btn thumbs-down" onclick="submitFeedback('${metadata.queryId}', -1, this)">
+            👎 无用
+          </button>
+          <button class="feedback-btn" onclick="showSuggestionModal('${metadata.queryId}')">
+            ✏️ 建议答案
+          </button>
+        `;
+        contentDiv.appendChild(feedbackDiv);
+
+        // 保存 queryId 用于反馈
+        messageDiv.dataset.queryId = metadata.queryId;
+        messageDiv.dataset.problemId = metadata.problemId;
+      }
+
+      messageDiv.appendChild(contentDiv);
+      chatMessages.appendChild(messageDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      return messageDiv;
+    }
+
+    function showTyping() {
+      const typingDiv = document.createElement('div');
+      typingDiv.className = 'message bot';
+      typingDiv.id = 'typing';
+      typingDiv.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+      chatMessages.appendChild(typingDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function removeTyping() {
+      const typing = document.getElementById('typing');
+      if (typing) typing.remove();
+    }
+
+    async function sendMessage() {
+      const message = messageInput.value.trim();
+      if (!message) return;
+
+      addMessage(message, true, { messageId: 'msg-' + Date.now() });
+      messageInput.value = '';
+
+      showTyping();
+
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ message })
+        });
+
+        const data = await response.json();
+        removeTyping();
+
+        lastQueryId = data.queryId;
+        addMessage(data.response, false, {
+          queryId: data.queryId,
+          problemId: data.problemId,
+          category: data.category,
+          hasFeedback: data.hasFeedback,
+          messageId: 'bot-' + data.queryId
+        });
+
+        sessionQueryCount++;
+        sessionStats.textContent = `本会话: ${sessionQueryCount} 查询`;
+
+        // 刷新统计
+        loadStats();
+      } catch (error) {
+        removeTyping();
+        addMessage('抱歉，发生了错误，请稍后重试。', false);
+      }
+    }
+
+    async function submitFeedback(queryId, rating, button) {
+      // 防止重复点击
+      if (button.classList.contains('active')) return;
+
+      try {
+        const response = await fetch('/api/feedback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            queryId,
+            rating
+          })
+        });
+
+        if (response.ok) {
+          // 禁用该消息的所有反馈按钮
+          const feedbackButtons = button.parentElement.querySelectorAll('.feedback-btn');
+          feedbackButtons.forEach(btn => btn.classList.add('active'));
+          button.classList.add(rating > 0 ? 'thumbs-up' : 'thumbs-down');
+
+          showToast('感谢您的反馈！');
+          loadStats();
+        }
+      } catch (error) {
+        console.error('提交反馈失败:', error);
+      }
+    }
+
+    function showSuggestionModal(queryId) {
+      const suggestion = prompt('请输入您认为更好的答案：');
+      if (suggestion && suggestion.trim()) {
+        submitSuggestion(queryId, suggestion.trim());
+      }
+    }
+
+    async function submitSuggestion(queryId, suggestedAnswer) {
+      try {
+        const response = await fetch('/api/suggest-answer', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            queryId,
+            suggestedAnswer
+          })
+        });
+
+        if (response.ok) {
+          showToast('感谢您的建议！我们会审核后更新答案。');
+        }
+      } catch (error) {
+        console.error('提交建议失败:', error);
+      }
+    }
+
+    function sendQuickQuestion(question) {
+      messageInput.value = question;
+      sendMessage();
+    }
+
+    function handleKeyPress(event) {
+      if (event.key === 'Enter') {
+        sendMessage();
+      }
+    }
+
+    function toggleStats() {
+      statsPanel.classList.toggle('show');
+      if (statsPanel.classList.contains('show')) {
+        loadStats();
+      }
+    }
+
+    async function loadStats() {
+      try {
+        const [analyticsResp, suggestionsResp] = await Promise.all([
+          fetch('/api/analytics'),
+          fetch('/api/suggestions')
+        ]);
+
+        const analytics = await analyticsResp.json();
+        const suggestionsData = await suggestionsResp.json();
+
+        // 更新基础统计
+        document.getElementById('totalQueries').textContent = analytics.total_queries || 0;
+        document.getElementById('totalFeedbacks').textContent = analytics.total_feedbacks || 0;
+
+        // 更新高频问题
+        const topQuestionsList = document.getElementById('topQuestionsList');
+        if (analytics.top_problems && analytics.top_problems.length > 0) {
+          topQuestionsList.innerHTML = analytics.top_problems
+            .slice(0, 5)
+            .map(p => `
+              <div class="top-question-item">
+                <span class="top-question-q">${p.question.substring(0, 20)}...</span>
+                <span class="top-question-count">${p.frequency}次</span>
+              </div>
+            `).join('');
+        } else {
+          topQuestionsList.innerHTML = '<div style="color: #999; font-size: 12px;">暂无数据</div>';
+        }
+
+        // 更新优化建议
+        const suggestionsList = document.getElementById('suggestionsList');
+        if (suggestionsData.suggestions && suggestionsData.suggestions.length > 0) {
+          suggestionsList.innerHTML = suggestionsData.suggestions
+            .slice(0, 3)
+            .map(s => `
+              <div class="suggestion-item">
+                <div class="suggestion-type">${s.type}</div>
+                <div>${s.suggestion}</div>
+              </div>
+            `).join('');
+        } else {
+          suggestionsList.innerHTML = '<div style="color: #999; font-size: 12px;">暂无建议</div>';
+        }
+      } catch (error) {
+        console.error('加载统计失败:', error);
+      }
+    }
+
+    function showToast(message) {
+      const toast = document.createElement('div');
+      toast.className = 'success-toast';
+      toast.textContent = message;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.remove();
+      }, 3000);
+    }
+
+    // 初始化时加载统计
+    loadStats();
+
+    messageInput.focus();
+  </script>
+</body>
+</html>
