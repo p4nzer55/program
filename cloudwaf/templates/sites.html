@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+{% block title %}站点管理 - CloudWAF{% endblock %}
+{% block page_title %}站点管理{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-title">
+        <span>站点列表</span>
+        <button class="btn btn-primary" onclick="showAddModal()">+ 新增站点</button>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>站点名称</th>
+                <th>域名</th>
+                <th>后端地址</th>
+                <th style="width: 120px;">防护模式</th>
+                <th style="width: 80px;">状态</th>
+                <th style="width: 180px;">操作</th>
+            </tr>
+        </thead>
+        <tbody id="siteTable"></tbody>
+    </table>
+</div>
+
+<div class="modal-mask" id="siteModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span id="modalTitle">新增站点</span>
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="siteId">
+            <div class="form-item">
+                <label>站点名称</label>
+                <input type="text" id="siteName" placeholder="如 官网">
+            </div>
+            <div class="form-item">
+                <label>域名</label>
+                <input type="text" id="siteDomain" placeholder="如 www.example.com">
+            </div>
+            <div class="form-item">
+                <label>后端服务地址</label>
+                <input type="text" id="siteBackend" placeholder="如 http://127.0.0.1:8080">
+            </div>
+            <div class="form-item">
+                <label>防护模式</label>
+                <select id="siteMode">
+                    <option value="protection">防护模式（拦截）</option>
+                    <option value="detect">检测模式（仅记录）</option>
+                    <option value="forward">转发模式（关闭防护）</option>
+                </select>
+            </div>
+            <div class="form-item">
+                <label>状态</label>
+                <select id="siteStatus">
+                    <option value="enabled">启用</option>
+                    <option value="disabled">禁用</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveSite()">保存</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const modeNames = {
+    'protection': '防护模式',
+    'detect': '检测模式',
+    'forward': '转发模式'
+};
+
+function loadSites() {
+    fetch('/api/sites').then(r => r.json()).then(data => {
+        if (data.code !== 0) return;
+        renderTable(data.data);
+    });
+}
+
+function renderTable(sites) {
+    const tbody = document.getElementById('siteTable');
+    if (sites.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#999;">暂无站点</td></tr>';
+        return;
+    }
+    tbody.innerHTML = sites.map(s => `
+        <tr>
+            <td>${s.id}</td>
+            <td>${s.name}</td>
+            <td>${s.domain}</td>
+            <td>${s.backend_url}</td>
+            <td>
+                <select onchange="changeMode(${s.id}, this.value)" style="padding:3px 6px;border:1px solid #d9d9d9;border-radius:4px;">
+                    <option value="protection" ${s.mode==='protection'?'selected':''}>防护模式</option>
+                    <option value="detect" ${s.mode==='detect'?'selected':''}>检测模式</option>
+                    <option value="forward" ${s.mode==='forward'?'selected':''}>转发模式</option>
+                </select>
+            </td>
+            <td>${s.status==='enabled' ? '<span class="tag tag-success">启用</span>' : '<span class="tag tag-default">禁用</span>'}</td>
+            <td>
+                <button class="btn btn-sm" onclick="editSite(${JSON.stringify(s).replace(/"/g,'&quot;')})">编辑</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteSite(${s.id}, '${s.name}')">删除</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function changeMode(id, mode) {
+    fetch(`/api/sites/${id}/mode`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({mode})
+    });
+}
+
+function showAddModal() {
+    document.getElementById('modalTitle').textContent = '新增站点';
+    document.getElementById('siteId').value = '';
+    document.getElementById('siteName').value = '';
+    document.getElementById('siteDomain').value = '';
+    document.getElementById('siteBackend').value = 'http://httpbin.org';
+    document.getElementById('siteMode').value = 'protection';
+    document.getElementById('siteStatus').value = 'enabled';
+    document.getElementById('siteModal').classList.add('show');
+}
+
+function editSite(s) {
+    document.getElementById('modalTitle').textContent = '编辑站点';
+    document.getElementById('siteId').value = s.id;
+    document.getElementById('siteName').value = s.name;
+    document.getElementById('siteDomain').value = s.domain;
+    document.getElementById('siteBackend').value = s.backend_url;
+    document.getElementById('siteMode').value = s.mode;
+    document.getElementById('siteStatus').value = s.status;
+    document.getElementById('siteModal').classList.add('show');
+}
+
+function saveSite() {
+    const id = document.getElementById('siteId').value;
+    const data = {
+        name: document.getElementById('siteName').value,
+        domain: document.getElementById('siteDomain').value,
+        backend_url: document.getElementById('siteBackend').value,
+        mode: document.getElementById('siteMode').value,
+        status: document.getElementById('siteStatus').value
+    };
+    if (!data.name || !data.domain || !data.backend_url) {
+        alert('请填写完整信息'); return;
+    }
+    const url = id ? `/api/sites/${id}` : '/api/sites';
+    const method = id ? 'PUT' : 'POST';
+    fetch(url, {
+        method, headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(d => {
+        if (d.code === 0) { closeModal(); loadSites(); }
+        else { alert(d.msg || '保存失败'); }
+    });
+}
+
+function deleteSite(id, name) {
+    if (!confirm(`确定删除站点 ${name}?`)) return;
+    fetch(`/api/sites/${id}`, {method: 'DELETE'}).then(r => r.json()).then(d => {
+        if (d.code === 0) loadSites();
+    });
+}
+
+function closeModal() { document.getElementById('siteModal').classList.remove('show'); }
+
+loadSites();
+</script>
+{% endblock %}

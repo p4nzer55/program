@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+{% block title %}防护规则 - CloudWAF{% endblock %}
+{% block page_title %}防护规则{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-title">
+        <span>防护规则管理</span>
+        <button class="btn btn-primary" onclick="showAddModal()">+ 新增规则</button>
+    </div>
+    <div class="filter-bar">
+        <select id="filterCategory" style="width: 160px;">
+            <option value="">全部分类</option>
+            <option value="sql_injection">SQL注入 (11条)</option>
+            <option value="xss">XSS攻击 (7条)</option>
+            <option value="command_injection">命令注入 (2条)</option>
+            <option value="directory_traversal">目录遍历 (2条)</option>
+            <option value="file_upload">文件上传 (1条)</option>
+            <option value="sensitive_path">敏感路径 (2条)</option>
+        </select>
+        <button class="btn btn-primary" onclick="loadRules()">筛选</button>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 100px;">规则名称</th>
+                <th style="width: 110px;">分类</th>
+                <th>描述</th>
+                <th style="width: 80px;">级别</th>
+                <th style="width: 100px;">状态</th>
+                <th style="width: 150px;">操作</th>
+            </tr>
+        </thead>
+        <tbody id="ruleTable"></tbody>
+    </table>
+</div>
+
+<div class="modal-mask" id="ruleModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span id="modalTitle">新增规则</span>
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="ruleId">
+            <div class="form-item">
+                <label>规则名称</label>
+                <input type="text" id="ruleName" placeholder="如 CUSTOM-001">
+            </div>
+            <div class="form-item">
+                <label>分类</label>
+                <select id="ruleCategory">
+                    <option value="sql_injection">SQL注入</option>
+                    <option value="xss">XSS攻击</option>
+                    <option value="command_injection">命令注入</option>
+                    <option value="directory_traversal">目录遍历</option>
+                    <option value="file_upload">文件上传</option>
+                    <option value="sensitive_path">敏感路径</option>
+                </select>
+            </div>
+            <div class="form-item">
+                <label>正则表达式</label>
+                <textarea id="rulePattern" placeholder="正则匹配模式"></textarea>
+            </div>
+            <div class="form-item">
+                <label>描述</label>
+                <input type="text" id="ruleDesc">
+            </div>
+            <div class="form-item">
+                <label>威胁级别</label>
+                <select id="ruleSeverity">
+                    <option value="high">高危</option>
+                    <option value="medium">中危</option>
+                    <option value="low">低危</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveRule()">保存</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const catNames = {
+    'sql_injection': 'SQL注入', 'xss': 'XSS攻击',
+    'command_injection': '命令注入', 'directory_traversal': '目录遍历',
+    'file_upload': '文件上传', 'sensitive_path': '敏感路径'
+};
+
+function loadRules() {
+    const cat = document.getElementById('filterCategory').value;
+    const url = cat ? `/api/rules?category=${cat}` : '/api/rules';
+    fetch(url).then(r => r.json()).then(data => {
+        if (data.code !== 0) return;
+        renderTable(data.data);
+    });
+}
+
+function renderTable(rules) {
+    const tbody = document.getElementById('ruleTable');
+    tbody.innerHTML = rules.map(r => `
+        <tr>
+            <td>${r.name}</td>
+            <td><span class="tag tag-default">${catNames[r.category] || r.category}</span></td>
+            <td>${r.description}</td>
+            <td>${sevTag(r.severity)}</td>
+            <td>
+                <label class="switch">
+                    <input type="checkbox" ${r.enabled?'checked':''} onchange="toggleRule(${r.id}, this)">
+                    <span class="slider"></span>
+                </label>
+            </td>
+            <td>
+                <button class="btn btn-sm" onclick="editRule(${JSON.stringify(r).replace(/"/g,'&quot;')})">编辑</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteRule(${r.id}, '${r.name}')">删除</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function sevTag(s) {
+    if (s === 'high') return '<span class="tag tag-high">高危</span>';
+    if (s === 'medium') return '<span class="tag tag-medium">中危</span>';
+    return '<span class="tag tag-low">低危</span>';
+}
+
+function toggleRule(id, el) {
+    fetch(`/api/rules/${id}/toggle`, {method: 'POST'});
+}
+
+function showAddModal() {
+    document.getElementById('modalTitle').textContent = '新增规则';
+    document.getElementById('ruleId').value = '';
+    document.getElementById('ruleName').value = '';
+    document.getElementById('ruleCategory').value = 'sql_injection';
+    document.getElementById('rulePattern').value = '';
+    document.getElementById('ruleDesc').value = '';
+    document.getElementById('ruleSeverity').value = 'medium';
+    document.getElementById('ruleModal').classList.add('show');
+}
+
+function editRule(r) {
+    document.getElementById('modalTitle').textContent = '编辑规则';
+    document.getElementById('ruleId').value = r.id;
+    document.getElementById('ruleName').value = r.name;
+    document.getElementById('ruleCategory').value = r.category;
+    document.getElementById('rulePattern').value = r.pattern;
+    document.getElementById('ruleDesc').value = r.description;
+    document.getElementById('ruleSeverity').value = r.severity;
+    document.getElementById('ruleModal').classList.add('show');
+}
+
+function saveRule() {
+    const id = document.getElementById('ruleId').value;
+    const data = {
+        name: document.getElementById('ruleName').value,
+        category: document.getElementById('ruleCategory').value,
+        pattern: document.getElementById('rulePattern').value,
+        description: document.getElementById('ruleDesc').value,
+        severity: document.getElementById('ruleSeverity').value
+    };
+    if (!data.name || !data.pattern) { alert('请填写规则名称和正则表达式'); return; }
+    const url = id ? `/api/rules/${id}` : '/api/rules';
+    const method = id ? 'PUT' : 'POST';
+    fetch(url, {
+        method, headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(d => {
+        if (d.code === 0) { closeModal(); loadRules(); }
+        else { alert(d.msg || '保存失败'); }
+    });
+}
+
+function deleteRule(id, name) {
+    if (!confirm(`确定删除规则 ${name}?`)) return;
+    fetch(`/api/rules/${id}`, {method: 'DELETE'}).then(r => r.json()).then(d => {
+        if (d.code === 0) loadRules();
+    });
+}
+
+function closeModal() { document.getElementById('ruleModal').classList.remove('show'); }
+
+loadRules();
+</script>
+{% endblock %}

@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% block title %}攻击日志 - CloudWAF{% endblock %}
+{% block page_title %}攻击日志{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-title">
+        <span>攻击日志查询</span>
+    </div>
+    <div class="filter-bar">
+        <input type="text" id="filterIp" placeholder="客户端IP" style="width: 150px;">
+        <select id="filterType" style="width: 140px;">
+            <option value="">全部类型</option>
+            <option value="sql_injection">SQL注入</option>
+            <option value="xss">XSS攻击</option>
+            <option value="command_injection">命令注入</option>
+            <option value="directory_traversal">目录遍历</option>
+            <option value="file_upload">文件上传</option>
+            <option value="sensitive_path">敏感路径</option>
+            <option value="cc_attack">CC攻击</option>
+            <option value="blacklist">黑名单</option>
+        </select>
+        <select id="filterSeverity" style="width: 120px;">
+            <option value="">全部级别</option>
+            <option value="high">高危</option>
+            <option value="medium">中危</option>
+            <option value="low">低危</option>
+        </select>
+        <button class="btn btn-primary" onclick="loadLogs()">查询</button>
+        <button class="btn" onclick="resetFilter()">重置</button>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 160px;">时间</th>
+                <th style="width: 120px;">客户端IP</th>
+                <th style="width: 70px;">方法</th>
+                <th>请求路径</th>
+                <th style="width: 110px;">攻击类型</th>
+                <th style="width: 110px;">规则</th>
+                <th style="width: 80px;">级别</th>
+                <th style="width: 80px;">动作</th>
+            </tr>
+        </thead>
+        <tbody id="logTable"></tbody>
+    </table>
+    <div class="pagination" id="pagination"></div>
+</div>
+
+<div class="modal-mask" id="detailModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span>日志详情</span>
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body" id="detailBody"></div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeModal()">关闭</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const categoryNames = {
+    'sql_injection': 'SQL注入', 'xss': 'XSS攻击',
+    'command_injection': '命令注入', 'directory_traversal': '目录遍历',
+    'file_upload': '文件上传', 'sensitive_path': '敏感路径',
+    'cc_attack': 'CC攻击', 'blacklist': '黑名单'
+};
+let currentPage = 1, totalPages = 1, total = 0;
+
+function loadLogs() {
+    const ip = document.getElementById('filterIp').value;
+    const type = document.getElementById('filterType').value;
+    const severity = document.getElementById('filterSeverity').value;
+    const params = new URLSearchParams({page: currentPage, per_page: 20});
+    if (ip) params.set('client_ip', ip);
+    if (type) params.set('attack_type', type);
+    if (severity) params.set('severity', severity);
+    fetch('/api/logs?' + params.toString()).then(r => r.json()).then(data => {
+        if (data.code !== 0) return;
+        const d = data.data;
+        total = d.total;
+        totalPages = Math.ceil(total / d.per_page) || 1;
+        renderTable(d.list);
+        renderPagination();
+    });
+}
+
+function renderTable(logs) {
+    const tbody = document.getElementById('logTable');
+    if (logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#999;">暂无数据</td></tr>';
+        return;
+    }
+    tbody.innerHTML = logs.map(l => `
+        <tr style="cursor:pointer;" onclick="showDetail(${JSON.stringify(l).replace(/"/g,'&quot;')})">
+            <td>${l.timestamp}</td>
+            <td>${l.client_ip}</td>
+            <td>${l.method}</td>
+            <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l.path}">${l.path}</td>
+            <td><span class="tag tag-high">${categoryNames[l.attack_type] || l.attack_type}</span></td>
+            <td>${l.rule_name}</td>
+            <td>${sevTag(l.severity)}</td>
+            <td>${l.action === 'block' ? '<span class="tag tag-danger">拦截</span>' : '<span class="tag tag-medium">检测</span>'}</td>
+        </tr>
+    `).join('');
+}
+
+function sevTag(s) {
+    if (s === 'high') return '<span class="tag tag-high">高危</span>';
+    if (s === 'medium') return '<span class="tag tag-medium">中危</span>';
+    return '<span class="tag tag-low">低危</span>';
+}
+
+function renderPagination() {
+    const p = document.getElementById('pagination');
+    let html = `<button ${currentPage<=1?'disabled':''} onclick="goPage(${currentPage-1})">上一页</button>`;
+    const start = Math.max(1, currentPage - 2), end = Math.min(totalPages, start + 4);
+    for (let i = start; i <= end; i++) {
+        html += `<button class="${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
+    }
+    html += `<button ${currentPage>=totalPages?'disabled':''} onclick="goPage(${currentPage+1})">下一页</button>`;
+    html += `<span style="margin-left:10px;color:#999;font-size:13px;">共 ${total} 条</span>`;
+    p.innerHTML = html;
+}
+
+function goPage(p) { currentPage = p; loadLogs(); }
+
+function resetFilter() {
+    document.getElementById('filterIp').value = '';
+    document.getElementById('filterType').value = '';
+    document.getElementById('filterSeverity').value = '';
+    currentPage = 1; loadLogs();
+}
+
+function showDetail(l) {
+    document.getElementById('detailBody').innerHTML = `
+        <div class="form-item"><label>时间</label><div>${l.timestamp}</div></div>
+        <div class="form-item"><label>客户端IP</label><div>${l.client_ip}</div></div>
+        <div class="form-item"><label>请求方法</label><div>${l.method}</div></div>
+        <div class="form-item"><label>请求路径</label><div style="word-break:break-all;">${l.path}</div></div>
+        <div class="form-item"><label>攻击类型</label><div>${categoryNames[l.attack_type] || l.attack_type}</div></div>
+        <div class="form-item"><label>命中规则</label><div>${l.rule_name}</div></div>
+        <div class="form-item"><label>威胁级别</label><div>${sevTag(l.severity)}</div></div>
+        <div class="form-item"><label>匹配内容</label><div style="background:#f5f5f5;padding:8px;border-radius:4px;word-break:break-all;font-family:monospace;">${l.matched_content || '-'}</div></div>
+        <div class="form-item"><label>处理动作</label><div>${l.action === 'block' ? '拦截' : '检测放行'}</div></div>
+    `;
+    document.getElementById('detailModal').classList.add('show');
+}
+
+function closeModal() { document.getElementById('detailModal').classList.remove('show'); }
+
+loadLogs();
+</script>
+{% endblock %}

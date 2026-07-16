@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>CloudWAF - 登录</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, "Microsoft YaHei", Arial, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .login-box { width: 400px; background: #fff; border-radius: 10px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+        .logo { text-align: center; margin-bottom: 30px; }
+        .logo h1 { font-size: 24px; color: #1890ff; margin-bottom: 8px; }
+        .logo p { color: #999; font-size: 13px; }
+        .form-item { margin-bottom: 20px; }
+        .form-item label { display: block; margin-bottom: 6px; color: #666; font-size: 14px; }
+        .form-item input { width: 100%; padding: 10px 14px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; outline: none; transition: border-color .2s; }
+        .form-item input:focus { border-color: #1890ff; }
+        .btn { width: 100%; padding: 10px; background: #1890ff; color: #fff; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; transition: background .2s; }
+        .btn:hover { background: #40a9ff; }
+        .error { color: #ff4d4f; font-size: 13px; margin-top: 10px; text-align: center; min-height: 18px; }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <div class="logo">
+            <h1>🛡️ CloudWAF</h1>
+            <p>云Web应用防火墙管理后台</p>
+        </div>
+        <form onsubmit="return doLogin(event)">
+            <div class="form-item">
+                <label>用户名</label>
+                <input type="text" id="username" value="admin" placeholder="请输入用户名">
+            </div>
+            <div class="form-item">
+                <label>密码</label>
+                <input type="password" id="password" value="admin123" placeholder="请输入密码">
+            </div>
+            <button type="submit" class="btn">登 录</button>
+            <div class="error" id="errorMsg"></div>
+        </form>
+    </div>
+    <script>
+        function doLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorMsg = document.getElementById('errorMsg');
+            fetch('/admin/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username, password})
+            }).then(r => r.json()).then(data => {
+                if (data.code === 0) {
+                    window.location.href = '/admin';
+                } else {
+                    errorMsg.textContent = data.msg || '登录失败';
+                }
+            }).catch(() => {
+                errorMsg.textContent = '网络错误';
+            });
+            return false;
+        }
+    </script>
+</body>
+</html>
