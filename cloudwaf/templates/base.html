@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CloudWAF 管理后台{% endblock %}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, "Microsoft YaHei", Arial, sans-serif; background: #f0f2f5; color: #333; }
+        .sidebar { position: fixed; left: 0; top: 0; width: 220px; height: 100vh; background: #001529; color: #fff; z-index: 100; }
+        .logo { height: 60px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; border-bottom: 1px solid #1f3a58; background: #002140; }
+        .logo span { color: #1890ff; }
+        .nav { padding: 12px 0; }
+        .nav-item { display: flex; align-items: center; padding: 12px 24px; color: #b8c3cd; cursor: pointer; text-decoration: none; transition: all .2s; }
+        .nav-item:hover { color: #fff; background: #1f3a58; }
+        .nav-item.active { color: #fff; background: #1890ff; }
+        .nav-item .icon { margin-right: 10px; width: 18px; text-align: center; }
+        .main { margin-left: 220px; min-height: 100vh; }
+        .header { height: 60px; background: #fff; box-shadow: 0 1px 4px rgba(0,21,41,.08); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; }
+        .header h1 { font-size: 18px; font-weight: 500; }
+        .header .user { display: flex; align-items: center; gap: 12px; color: #666; font-size: 14px; }
+        .header .user a { color: #1890ff; text-decoration: none; }
+        .content { padding: 24px; }
+        .card { background: #fff; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.08); padding: 20px; margin-bottom: 20px; }
+        .card-title { font-size: 16px; font-weight: 500; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
+        .btn { display: inline-block; padding: 6px 16px; border: 1px solid #d9d9d9; background: #fff; border-radius: 4px; cursor: pointer; font-size: 14px; text-decoration: none; color: #333; transition: all .2s; }
+        .btn:hover { color: #1890ff; border-color: #1890ff; }
+        .btn-primary { background: #1890ff; color: #fff; border-color: #1890ff; }
+        .btn-primary:hover { background: #40a9ff; color: #fff; border-color: #40a9ff; }
+        .btn-danger { color: #ff4d4f; border-color: #ff4d4f; }
+        .btn-danger:hover { background: #ff4d4f; color: #fff; }
+        .btn-sm { padding: 3px 10px; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0f0f0; }
+        th { background: #fafafa; font-weight: 500; color: #666; }
+        tr:hover { background: #fafafa; }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+        .tag-high { background: #fff1f0; color: #ff4d4f; border: 1px solid #ffa39e; }
+        .tag-medium { background: #fff7e6; color: #fa8c16; border: 1px solid #ffd591; }
+        .tag-low { background: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
+        .tag-success { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
+        .tag-danger { background: #fff1f0; color: #ff4d4f; border: 1px solid #ffa39e; }
+        .tag-default { background: #f5f5f5; color: #666; border: 1px solid #d9d9d9; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+        .stat-card { background: #fff; border-radius: 6px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .stat-card .label { color: #999; font-size: 13px; margin-bottom: 8px; }
+        .stat-card .value { font-size: 28px; font-weight: bold; color: #333; }
+        .stat-card .icon { float: right; font-size: 32px; opacity: .5; }
+        .modal-mask { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal-mask.show { display: flex; }
+        .modal { background: #fff; border-radius: 6px; width: 500px; max-height: 80vh; overflow: auto; }
+        .modal-header { padding: 16px 24px; border-bottom: 1px solid #f0f0f0; font-size: 16px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
+        .modal-close { cursor: pointer; color: #999; font-size: 20px; }
+        .modal-body { padding: 24px; }
+        .modal-footer { padding: 12px 24px; border-top: 1px solid #f0f0f0; text-align: right; }
+        .form-item { margin-bottom: 16px; }
+        .form-item label { display: block; margin-bottom: 6px; color: #666; font-size: 14px; }
+        .form-item input, .form-item select, .form-item textarea { width: 100%; padding: 6px 12px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 14px; outline: none; }
+        .form-item input:focus, .form-item select:focus, .form-item textarea:focus { border-color: #1890ff; }
+        .form-item textarea { min-height: 80px; resize: vertical; font-family: monospace; }
+        .pagination { display: flex; justify-content: flex-end; gap: 6px; margin-top: 16px; }
+        .pagination button { padding: 4px 10px; border: 1px solid #d9d9d9; background: #fff; border-radius: 4px; cursor: pointer; }
+        .pagination button.active { background: #1890ff; color: #fff; border-color: #1890ff; }
+        .pagination button:disabled { cursor: not-allowed; opacity: .5; }
+        .filter-bar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+        .filter-bar input, .filter-bar select { padding: 6px 12px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 14px; outline: none; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; border-radius: 22px; transition: .3s; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .3s; }
+        input:checked + .slider { background: #1890ff; }
+        input:checked + .slider:before { transform: translateX(22px); }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo">🛡️ <span>Cloud</span>WAF</div>
+        <div class="nav">
+            <a class="nav-item {% if active=='dashboard' %}active{% endif %}" href="/admin">
+                <span class="icon">📊</span> 仪表盘
+            </a>
+            <a class="nav-item {% if active=='logs' %}active{% endif %}" href="/admin/logs">
+                <span class="icon">📋</span> 攻击日志
+            </a>
+            <a class="nav-item {% if active=='rules' %}active{% endif %}" href="/admin/rules">
+                <span class="icon">📜</span> 防护规则
+            </a>
+            <a class="nav-item {% if active=='sites' %}active{% endif %}" href="/admin/sites">
+                <span class="icon">🌐</span> 站点管理
+            </a>
+            <a class="nav-item {% if active=='access' %}active{% endif %}" href="/admin/access">
+                <span class="icon">🔒</span> 访问控制
+            </a>
+        </div>
+    </div>
+    <div class="main">
+        <div class="header">
+            <h1>{% block page_title %}{% endblock %}</h1>
+            <div class="user">
+                <span>👤 admin</span>
+                <a href="/admin/logout">退出</a>
+            </div>
+        </div>
+        <div class="content">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

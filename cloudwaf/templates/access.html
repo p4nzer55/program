@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+{% block title %}访问控制 - CloudWAF{% endblock %}
+{% block page_title %}访问控制{% endblock %}
+{% block content %}
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+    <div class="card">
+        <div class="card-title">
+            <span>IP 黑名单</span>
+            <button class="btn btn-primary btn-sm" onclick="showBlackModal()">+ 添加</button>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>IP地址</th>
+                    <th>原因</th>
+                    <th>过期时间</th>
+                    <th style="width: 80px;">操作</th>
+                </tr>
+            </thead>
+            <tbody id="blackTable"></tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <div class="card-title">
+            <span>IP 白名单</span>
+            <button class="btn btn-primary btn-sm" onclick="showWhiteModal()">+ 添加</button>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>IP地址</th>
+                    <th>备注</th>
+                    <th style="width: 80px;">操作</th>
+                </tr>
+            </thead>
+            <tbody id="whiteTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal-mask" id="blackModal">
+    <div class="modal" style="width: 420px;">
+        <div class="modal-header">
+            <span>添加黑名单</span>
+            <span class="modal-close" onclick="closeBlackModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="form-item">
+                <label>IP地址</label>
+                <input type="text" id="blackIp" placeholder="如 192.168.1.100">
+            </div>
+            <div class="form-item">
+                <label>封禁原因</label>
+                <input type="text" id="blackReason" placeholder="如 恶意攻击">
+            </div>
+            <div class="form-item">
+                <label>封禁时长（秒，留空永久）</label>
+                <input type="number" id="blackDuration" placeholder="如 3600">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeBlackModal()">取消</button>
+            <button class="btn btn-primary" onclick="addBlacklist()">添加</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-mask" id="whiteModal">
+    <div class="modal" style="width: 420px;">
+        <div class="modal-header">
+            <span>添加白名单</span>
+            <span class="modal-close" onclick="closeWhiteModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="form-item">
+                <label>IP地址</label>
+                <input type="text" id="whiteIp" placeholder="如 127.0.0.1">
+            </div>
+            <div class="form-item">
+                <label>备注</label>
+                <input type="text" id="whiteRemark" placeholder="如 内部访问">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeWhiteModal()">取消</button>
+            <button class="btn btn-primary" onclick="addWhitelist()">添加</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function loadBlacklist() {
+    fetch('/api/access/blacklist').then(r => r.json()).then(data => {
+        if (data.code !== 0) return;
+        const tbody = document.getElementById('blackTable');
+        if (data.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;color:#999;">暂无数据</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.data.map(item => `
+            <tr>
+                <td><span class="tag tag-danger">${item.ip}</span></td>
+                <td>${item.reason || '-'}</td>
+                <td style="font-size:12px;color:#666;">${item.expires_at || '永久'}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="removeBlacklist('${item.ip}')">删除</button>
+                </td>
+            </tr>
+        `).join('');
+    });
+}
+
+function loadWhitelist() {
+    fetch('/api/access/whitelist').then(r => r.json()).then(data => {
+        if (data.code !== 0) return;
+        const tbody = document.getElementById('whiteTable');
+        if (data.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:30px;color:#999;">暂无数据</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.data.map(item => `
+            <tr>
+                <td><span class="tag tag-success">${item.ip}</span></td>
+                <td>${item.remark || '-'}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="removeWhitelist('${item.ip}')">删除</button>
+                </td>
+            </tr>
+        `).join('');
+    });
+}
+
+function showBlackModal() { document.getElementById('blackModal').classList.add('show'); }
+function closeBlackModal() { document.getElementById('blackModal').classList.remove('show'); }
+
+function addBlacklist() {
+    const ip = document.getElementById('blackIp').value.trim();
+    const reason = document.getElementById('blackReason').value;
+    const duration = document.getElementById('blackDuration').value;
+    if (!ip) { alert('请输入IP地址'); return; }
+    fetch('/api/access/blacklist', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ip, reason, duration: duration || null})
+    }).then(r => r.json()).then(d => {
+        if (d.code === 0) {
+            closeBlackModal();
+            document.getElementById('blackIp').value = '';
+            document.getElementById('blackReason').value = '';
+            document.getElementById('blackDuration').value = '';
+            loadBlacklist();
+        }
+    });
+}
+
+function removeBlacklist(ip) {
+    if (!confirm(`确定移除 ${ip}?`)) return;
+    fetch(`/api/access/blacklist/${ip}`, {method: 'DELETE'}).then(r => r.json()).then(d => {
+        if (d.code === 0) loadBlacklist();
+    });
+}
+
+function showWhiteModal() { document.getElementById('whiteModal').classList.add('show'); }
+function closeWhiteModal() { document.getElementById('whiteModal').classList.remove('show'); }
+
+function addWhitelist() {
+    const ip = document.getElementById('whiteIp').value.trim();
+    const remark = document.getElementById('whiteRemark').value;
+    if (!ip) { alert('请输入IP地址'); return; }
+    fetch('/api/access/whitelist', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ip, remark})
+    }).then(r => r.json()).then(d => {
+        if (d.code === 0) {
+            closeWhiteModal();
+            document.getElementById('whiteIp').value = '';
+            document.getElementById('whiteRemark').value = '';
+            loadWhitelist();
+        }
+    });
+}
+
+function removeWhitelist(ip) {
+    if (!confirm(`确定移除 ${ip}?`)) return;
+    fetch(`/api/access/whitelist/${ip}`, {method: 'DELETE'}).then(r => r.json()).then(d => {
+        if (d.code === 0) loadWhitelist();
+    });
+}
+
+loadBlacklist();
+loadWhitelist();
+</script>
+{% endblock %}

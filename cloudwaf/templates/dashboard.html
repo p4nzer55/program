@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% block title %}仪表盘 - CloudWAF{% endblock %}
+{% block page_title %}仪表盘{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <span class="icon">🚨</span>
+        <div class="label">今日攻击拦截</div>
+        <div class="value" id="todayCount">0</div>
+    </div>
+    <div class="stat-card">
+        <span class="icon">📊</span>
+        <div class="label">累计攻击总量</div>
+        <div class="value" id="totalCount">0</div>
+    </div>
+    <div class="stat-card">
+        <span class="icon">🌐</span>
+        <div class="label">防护站点</div>
+        <div class="value" id="sitesCount">0</div>
+    </div>
+    <div class="stat-card">
+        <span class="icon">📜</span>
+        <div class="label">启用规则</div>
+        <div class="value" id="rulesCount">0</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+    <div class="card">
+        <div class="card-title">24小时攻击趋势</div>
+        <div id="trendChart" style="height: 300px;"></div>
+    </div>
+    <div class="card">
+        <div class="card-title">攻击类型分布</div>
+        <div id="typeChart" style="height: 300px;"></div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+    <div class="card">
+        <div class="card-title">攻击来源 TOP 10</div>
+        <div id="ipChart" style="height: 300px;"></div>
+    </div>
+    <div class="card">
+        <div class="card-title">最近攻击记录</div>
+        <table>
+            <thead>
+                <tr><th>时间</th><th>IP</th><th>类型</th><th>动作</th></tr>
+            </thead>
+            <tbody id="recentTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+const categoryNames = {
+    'sql_injection': 'SQL注入', 'xss': 'XSS攻击',
+    'command_injection': '命令注入', 'directory_traversal': '目录遍历',
+    'file_upload': '文件上传', 'sensitive_path': '敏感路径',
+    'cc_attack': 'CC攻击', 'blacklist': '黑名单'
+};
+const typeColors = {
+    'SQL注入': '#ff4d4f', 'XSS攻击': '#fa8c16',
+    '命令注入': '#722ed1', '目录遍历': '#13c2c2',
+    '文件上传': '#eb2f96', '敏感路径': '#2f54eb',
+    'CC攻击': '#faad14', '黑名单': '#f5222d'
+};
+
+let trendChart, typeChart, ipChart;
+
+function loadStats() {
+    fetch('/api/dashboard/stats').then(r => r.json()).then(data => {
+        if (data.code !== 0) return;
+        const d = data.data;
+        document.getElementById('todayCount').textContent = d.total_today.toLocaleString();
+        document.getElementById('totalCount').textContent = d.total_all.toLocaleString();
+        document.getElementById('sitesCount').textContent = d.sites_count;
+        document.getElementById('rulesCount').textContent = d.rules_count;
+
+        const trendData = d.hourly_trend.map(h => h.count);
+        const trendLabels = d.hourly_trend.map(h => h.hour);
+        trendChart.setOption({
+            tooltip: { trigger: 'axis' },
+            grid: { left: 40, right: 20, top: 20, bottom: 30 },
+            xAxis: { type: 'category', data: trendLabels, axisLabel: { fontSize: 11 } },
+            yAxis: { type: 'value' },
+            series: [{
+                data: trendData, type: 'line', smooth: true,
+                areaStyle: { color: 'rgba(24,144,255,0.2)' },
+                lineStyle: { color: '#1890ff', width: 2 },
+                itemStyle: { color: '#1890ff' }
+            }]
+        });
+
+        const typeData = Object.entries(d.type_distribution).map(([k,v]) => ({
+            name: categoryNames[k] || k, value: v
+        }));
+        typeChart.setOption({
+            tooltip: { trigger: 'item' },
+            legend: { bottom: 0, type: 'scroll', textStyle: { fontSize: 11 } },
+            series: [{
+                type: 'pie', radius: ['40%', '70%'], center: ['50%', '45%'],
+                data: typeData,
+                label: { fontSize: 11, formatter: '{b}: {c}' }
+            }]
+        });
+
+        const ipData = d.top_ips.map(i => i.ip);
+        const ipCounts = d.top_ips.map(i => i.count);
+        ipChart.setOption({
+            tooltip: { trigger: 'axis' },
+            grid: { left: 110, right: 20, top: 10, bottom: 30 },
+            xAxis: { type: 'value' },
+            yAxis: { type: 'category', data: ipData.reverse(), axisLabel: { fontSize: 11 } },
+            series: [{
+                data: ipCounts.reverse(), type: 'bar',
+                itemStyle: { color: '#ff4d4f' },
+                label: { show: true, position: 'right', fontSize: 11 }
+            }]
+        });
+
+        const tbody = document.getElementById('recentTable');
+        tbody.innerHTML = d.recent_attacks.map(a => `
+            <tr>
+                <td>${a.timestamp}</td>
+                <td>${a.client_ip}</td>
+                <td><span class="tag tag-high">${categoryNames[a.attack_type] || a.attack_type}</span></td>
+                <td>${a.action === 'block' ? '<span class="tag tag-danger">拦截</span>' : '<span class="tag tag-medium">检测</span>'}</td>
+            </tr>
+        `).join('');
+    });
+}
+
+window.addEventListener('load', () => {
+    trendChart = echarts.init(document.getElementById('trendChart'));
+    typeChart = echarts.init(document.getElementById('typeChart'));
+    ipChart = echarts.init(document.getElementById('ipChart'));
+    loadStats();
+    setInterval(loadStats, 10000);
+    window.addEventListener('resize', () => {
+        trendChart.resize(); typeChart.resize(); ipChart.resize();
+    });
+});
+</script>
+{% endblock %}
