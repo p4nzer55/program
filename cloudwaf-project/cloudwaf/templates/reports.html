@@ -1,0 +1,456 @@
+{% extends 'base.html' %}
+{% block title %}报告管理 - CloudWAF{% endblock %}
+{% block page_title %}报告管理{% endblock %}
+{% block content %}
+
+<div class="card">
+    <div class="card-title">
+        <span>防护报告</span>
+        <button class="btn btn-primary" onclick="showGenerateModal()">+ 生成报告</button>
+    </div>
+
+    <div class="filter-bar">
+        <select id="reportTypeFilter" onchange="filterReports()">
+            <option value="">全部类型</option>
+            <option value="daily">日报</option>
+            <option value="weekly">周报</option>
+            <option value="monthly">月报</option>
+            <option value="yearly">年报</option>
+            <option value="summary">汇总报告</option>
+        </select>
+        <input type="text" id="reportSiteFilter" placeholder="站点名称" onchange="filterReports()">
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>报告类型</th>
+                <th>站点</th>
+                <th>时间范围</th>
+                <th>生成时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody id="reportTable"></tbody>
+    </table>
+</div>
+
+<!-- 生成报告弹窗 -->
+<div class="modal-mask" id="generateModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span>生成防护报告</span>
+            <span class="modal-close" onclick="closeGenerateModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="form-item">
+                <label>报告类型</label>
+                <select id="generateReportType" onchange="toggleReportFields()">
+                    <option value="daily">日报</option>
+                    <option value="weekly">周报</option>
+                    <option value="monthly">月报</option>
+                    <option value="summary">汇总报告</option>
+                </select>
+            </div>
+
+            <div class="form-item">
+                <label>站点</label>
+                <select id="generateSiteId">
+                    <option value="">全部站点</option>
+                </select>
+            </div>
+
+            <div id="dateFields">
+                <div class="form-item" id="dateField">
+                    <label>日期</label>
+                    <input type="date" id="generateDate">
+                </div>
+            </div>
+
+            <div id="summaryDateFields" style="display:none;">
+                <div class="form-item">
+                    <label>开始日期</label>
+                    <input type="date" id="startDate">
+                </div>
+                <div class="form-item">
+                    <label>结束日期</label>
+                    <input type="date" id="endDate">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeGenerateModal()">取消</button>
+            <button class="btn btn-primary" onclick="generateReport()">生成报告</button>
+        </div>
+    </div>
+</div>
+
+<!-- 报告详情弹窗 -->
+<div class="modal-mask" id="reportDetailModal">
+    <div class="modal" style="width: 800px;">
+        <div class="modal-header">
+            <span>报告详情</span>
+            <span class="modal-close" onclick="closeReportDetailModal()">&times;</span>
+        </div>
+        <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+            <div id="reportDetailContent"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="exportReportJson()">导出JSON</button>
+            <button class="btn btn-primary" onclick="exportReportCsv()">导出CSV</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentReportId = null;
+
+const reportTypeNames = {
+    'daily': '日报',
+    'weekly': '周报',
+    'monthly': '月报',
+    'yearly': '年报',
+    'summary': '汇总报告'
+};
+
+const categoryNames = {
+    'sql_injection': 'SQL注入',
+    'xss': 'XSS攻击',
+    'command_injection': '命令注入',
+    'directory_traversal': '目录遍历',
+    'file_upload': '恶意上传',
+    'sensitive_path': '敏感路径',
+    'cc_attack': 'CC攻击',
+    'blacklist': 'IP黑名单',
+    'geo_block': '区域访问限制'
+};
+
+let allReports = [];
+let allSites = [];
+
+// 初始化
+loadSites();
+loadReports();
+
+function loadSites() {
+    fetch('/api/sites').then(r => r.json()).then(data => {
+        if (data.code !== 0) return;
+        allSites = data.data;
+        const select = document.getElementById('generateSiteId');
+        select.innerHTML = '<option value="">全部站点</option>' +
+            allSites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    });
+}
+
+function loadReports() {
+    const type = document.getElementById('reportTypeFilter').value;
+    const siteName = document.getElementById('reportSiteFilter').value;
+
+    let url = '/api/reports';
+    if (type) url += '?report_type=' + type;
+
+    fetch(url).then(r => r.json()).then(data => {
+        if (data.code !== 0) return;
+        allReports = data.data;
+
+        // 筛选
+        let filtered = data.data;
+        if (siteName) {
+            filtered = filtered.filter(r => r.site_name && r.site_name.includes(siteName));
+        }
+
+        renderReports(filtered);
+    });
+}
+
+function filterReports() {
+    loadReports();
+}
+
+function renderReports(reports) {
+    const tbody = document.getElementById('reportTable');
+    if (reports.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#999;">暂无报告</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = reports.map(r => `
+        <tr>
+            <td>${r.id}</td>
+            <td><span class="tag tag-medium">${reportTypeNames[r.report_type] || r.report_type}</span></td>
+            <td>${r.site_name || '-'}</td>
+            <td>${r.start_date} ~ ${r.end_date}</td>
+            <td>${r.created_at}</td>
+            <td>
+                <button class="btn btn-sm" onclick="showReportDetail(${r.id})">查看</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function showGenerateModal() {
+    // 设置默认日期为今天
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('generateDate').value = today;
+    document.getElementById('startDate').value = today;
+    document.getElementById('endDate').value = today;
+
+    document.getElementById('generateModal').classList.add('show');
+}
+
+function closeGenerateModal() {
+    document.getElementById('generateModal').classList.remove('show');
+}
+
+function toggleReportFields() {
+    const type = document.getElementById('generateReportType').value;
+    document.getElementById('dateFields').style.display = type === 'summary' ? 'none' : 'block';
+    document.getElementById('summaryDateFields').style.display = type === 'summary' ? 'block' : 'none';
+}
+
+function generateReport() {
+    const type = document.getElementById('generateReportType').value;
+    const siteId = document.getElementById('generateSiteId').value;
+
+    let data = {report_type: type};
+
+    if (siteId) data.site_id = parseInt(siteId);
+
+    if (type === 'summary') {
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+        if (!startDate || !endDate) { alert('请选择日期范围'); return; }
+        data.start_date = startDate;
+        data.end_date = endDate;
+    } else {
+        const date = document.getElementById('generateDate').value;
+        if (!date) { alert('请选择日期'); return; }
+        data.date = date;
+
+        if (type === 'monthly') {
+            const d = new Date(date);
+            data.year = d.getFullYear();
+            data.month = d.getMonth() + 1;
+        }
+    }
+
+    fetch('/api/reports/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(d => {
+        if (d.code === 0) {
+            closeGenerateModal();
+            loadReports();
+            alert('报告生成成功！');
+        } else {
+            alert(d.msg || '生成失败');
+        }
+    });
+}
+
+function showReportDetail(reportId) {
+    currentReportId = reportId;
+    fetch(`/api/reports/${reportId}`).then(r => r.json()).then(data => {
+        if (data.code !== 0 || !data.data) {
+            // 尝试获取JSON数据
+            fetch(`/api/reports/${reportId}/export/json`).then(r => r.json()).then(jsonData => {
+                if (jsonData.code === 0) {
+                    renderReportDetail(jsonData.data);
+                }
+            });
+            return;
+        }
+        renderReportDetail(data.data);
+    });
+}
+
+function renderReportDetail(data) {
+    const container = document.getElementById('reportDetailContent');
+
+    let html = `
+        <div style="margin-bottom: 24px;">
+            <h2 style="margin-bottom: 8px;">CloudWAF 防护报告</h2>
+            <p style="color: #666;">
+                ${data.site_name ? `站点: ${data.site_name} | ` : ''}
+                时间范围: ${data.start_date} ~ ${data.end_date}
+            </p>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom: 24px;">
+            <div class="stat-card">
+                <div class="label">总攻击数</div>
+                <div class="value">${data.total_attacks || 0}</div>
+                <div class="icon">⚠️</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">拦截次数</div>
+                <div class="value">${(data.action_distribution?.block || 0)}</div>
+                <div class="icon">🚫</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">放行次数</div>
+                <div class="value">${(data.action_distribution?.detect || 0)}</div>
+                <div class="icon">✅</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">攻击类型</div>
+                <div class="value">${Object.keys(data.type_distribution || {}).length}</div>
+                <div class="icon">📊</div>
+            </div>
+        </div>
+    `;
+
+    // 攻击类型分布
+    if (data.type_distribution && Object.keys(data.type_distribution).length > 0) {
+        html += `
+            <div style="margin-bottom: 24px;">
+                <h3 style="margin-bottom: 12px;">攻击类型分布</h3>
+                <table style="margin-bottom: 12px;">
+                    <thead>
+                        <tr>
+                            <th>攻击类型</th>
+                            <th>数量</th>
+                            <th>占比</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        const total = Object.values(data.type_distribution).reduce((a, b) => a + b, 0);
+        for (const [type, count] of Object.entries(data.type_distribution)) {
+            const percent = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
+            html += `
+                <tr>
+                    <td>${categoryNames[type] || type}</td>
+                    <td>${count}</td>
+                    <td>${percent}%</td>
+                </tr>
+            `;
+        }
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // 严重程度分布
+    if (data.severity_distribution && Object.keys(data.severity_distribution).length > 0) {
+        html += `
+            <div style="margin-bottom: 24px;">
+                <h3 style="margin-bottom: 12px;">严重程度分布</h3>
+                <div style="display: flex; gap: 16px;">
+        `;
+
+        const severityColors = {'high': '#ff4d4f', 'medium': '#fa8c16', 'low': '#1890ff'};
+        const severityNames = {'high': '高危', 'medium': '中危', 'low': '低危'};
+
+        for (const [sev, count] of Object.entries(data.severity_distribution)) {
+            html += `
+                <div style="padding: 12px; background: #fafafa; border-radius: 4px; text-align: center; min-width: 100px;">
+                    <div style="color: ${severityColors[sev] || '#666'}; font-weight: bold; font-size: 20px;">${count}</div>
+                    <div style="color: #666; font-size: 12px;">${severityNames[sev] || sev}</div>
+                </div>
+            `;
+        }
+
+        html += `
+                </div>
+            </div>
+        `;
+    }
+
+    // Top攻击IP
+    if (data.top_attackers && data.top_attackers.length > 0) {
+        html += `
+            <div style="margin-bottom: 24px;">
+                <h3 style="margin-bottom: 12px;">Top 攻击IP</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>IP地址</th>
+                            <th>攻击次数</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        data.top_attackers.slice(0, 10).forEach((attacker, index) => {
+            html += `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${attacker.ip}</td>
+                    <td>${attacker.count}</td>
+                </tr>
+            `;
+        });
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // 时间趋势
+    if (data.time_trend && data.time_trend.length > 0) {
+        html += `
+            <div style="margin-bottom: 24px;">
+                <h3 style="margin-bottom: 12px;">攻击时间趋势</h3>
+                <div style="display: flex; align-items: flex-end; height: 200px; gap: 4px; border-bottom: 1px solid #ddd; padding-bottom: 8px;">
+        `;
+
+        const maxCount = Math.max(...data.time_trend.map(t => t.count), 1);
+        data.time_trend.forEach(t => {
+            const height = (t.count / maxCount) * 180;
+            html += `
+                <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                    <div style="width: 100%; min-height: 2px; background: #1890ff; border-radius: 2px 2px 0 0;"
+                         style="height: ${height}px;"></div>
+                    <div style="font-size: 10px; color: #999; margin-top: 4px;">${t.time}</div>
+                    <div style="font-size: 10px; font-weight: bold;">${t.count}</div>
+                </div>
+            `;
+        });
+
+        html += `
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = html;
+    document.getElementById('reportDetailModal').classList.add('show');
+}
+
+function closeReportDetailModal() {
+    document.getElementById('reportDetailModal').classList.remove('show');
+}
+
+function exportReportJson() {
+    if (!currentReportId) return;
+    fetch(`/api/reports/${currentReportId}/export/json`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.code === 0) {
+                const blob = new Blob([JSON.stringify(data.data, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `waf_report_${currentReportId}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        });
+}
+
+function exportReportCsv() {
+    if (!currentReportId) return;
+    window.location.href = `/api/reports/${currentReportId}/export/csv`;
+}
+</script>
+{% endblock %}

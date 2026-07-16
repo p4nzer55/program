@@ -1,0 +1,622 @@
+{% extends 'base.html' %}
+{% block title %}站点管理 - CloudWAF{% endblock %}
+{% block page_title %}站点管理{% endblock %}
+{% block extra_css %}
+<style>
+.tabs { display: flex; border-bottom: 1px solid #f0f0f0; margin-bottom: 20px; }
+.tab { padding: 12px 24px; cursor: pointer; border-bottom: 2px solid transparent; color: #666; }
+.tab.active { color: #1890ff; border-bottom-color: #1890ff; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.detail-section { margin-bottom: 24px; }
+.detail-section h3 { font-size: 14px; color: #666; margin-bottom: 12px; }
+.switch-label { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.port-item { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: #f5f5f5; border-radius: 4px; margin-right: 8px; margin-bottom: 8px; }
+.rule-item { padding: 12px; background: #fafafa; border-radius: 4px; margin-bottom: 8px; }
+.rule-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.country-tag { display: inline-block; padding: 2px 8px; background: #e6f7ff; color: #1890ff; border-radius: 4px; font-size: 12px; margin-right: 4px; }
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="card">
+    <div class="card-title">
+        <span>站点列表</span>
+        <button class="btn btn-primary" onclick="showAddModal()">+ 新增站点</button>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>站点名称</th>
+                <th>域名</th>
+                <th>后端地址</th>
+                <th style="width: 100px;">防护模式</th>
+                <th style="width: 80px;">状态</th>
+                <th style="width: 120px;">维护模式</th>
+                <th style="width: 150px;">操作</th>
+            </tr>
+        </thead>
+        <tbody id="siteTable"></tbody>
+    </table>
+</div>
+
+<!-- 站点详情弹窗 -->
+<div class="modal-mask" id="detailModal">
+    <div class="modal" style="width: 700px;">
+        <div class="modal-header">
+            <span id="detailTitle">站点详情</span>
+            <span class="modal-close" onclick="closeDetailModal()">&times;</span>
+        </div>
+        <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+            <input type="hidden" id="detailSiteId">
+
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('basic')">基本信息</div>
+                <div class="tab" onclick="switchTab('ports')">端口管理</div>
+                <div class="tab" onclick="switchTab('geo')">区域访问控制</div>
+                <div class="tab" onclick="switchTab('url')">URL级策略</div>
+            </div>
+
+            <!-- 基本信息标签页 -->
+            <div id="tab-basic" class="tab-content active">
+                <div class="form-item">
+                    <label>站点名称</label>
+                    <input type="text" id="detailName">
+                </div>
+                <div class="form-item">
+                    <label>域名</label>
+                    <input type="text" id="detailDomain">
+                </div>
+                <div class="form-item">
+                    <label>后端服务地址</label>
+                    <input type="text" id="detailBackend">
+                </div>
+                <div class="form-item">
+                    <label>防护模式</label>
+                    <select id="detailMode">
+                        <option value="protection">防护模式（拦截）</option>
+                        <option value="detect">检测模式（仅记录）</option>
+                        <option value="forward">转发模式（关闭防护）</option>
+                    </select>
+                </div>
+
+                <div class="detail-section">
+                    <h3>维护模式（一键关停）</h3>
+                    <div class="switch-label">
+                        <label class="switch">
+                            <input type="checkbox" id="maintenanceMode" onchange="toggleMaintenance()">
+                            <span class="slider"></span>
+                        </label>
+                        <span id="maintenanceStatus">已关闭</span>
+                    </div>
+                    <div class="form-item" id="maintenanceMessageItem" style="display:none;">
+                        <label>维护提示信息</label>
+                        <textarea id="maintenanceMessage" placeholder="系统维护中，请稍后再访问..."></textarea>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <h3>回源模式（绕过WAF）</h3>
+                    <div class="switch-label">
+                        <label class="switch">
+                            <input type="checkbox" id="bypassEnabled" onchange="toggleBypass()">
+                            <span class="slider"></span>
+                        </label>
+                        <span>启用回源（流量直接到源站）</span>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <h3>HTTPS配置</h3>
+                    <div class="switch-label">
+                        <label class="switch">
+                            <input type="checkbox" id="forceHttps" onchange="toggleForceHttps()">
+                            <span class="slider"></span>
+                        </label>
+                        <span>强制HTTP跳转HTTPS</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 端口管理标签页 -->
+            <div id="tab-ports" class="tab-content">
+                <div class="filter-bar" style="margin-bottom: 16px;">
+                    <input type="number" id="portNumber" placeholder="端口号" style="width: 100px;">
+                    <select id="portProtocol">
+                        <option value="http">HTTP</option>
+                        <option value="https">HTTPS</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="addPort()">+ 添加端口</button>
+                </div>
+                <div id="portList"></div>
+            </div>
+
+            <!-- 区域访问控制标签页 -->
+            <div id="tab-geo" class="tab-content">
+                <div class="filter-bar" style="margin-bottom: 16px;">
+                    <select id="geoRuleType">
+                        <option value="blacklist">黑名单（禁止访问）</option>
+                        <option value="whitelist">白名单（只允许访问）</option>
+                    </select>
+                    <input type="text" id="geoCountries" placeholder="国家代码，逗号分隔，如: CN,US,UK" style="width: 280px;">
+                    <button class="btn btn-primary" onclick="addGeoRule()">+ 添加规则</button>
+                </div>
+                <div id="geoRuleList"></div>
+
+                <div class="detail-section" style="margin-top: 20px; padding: 12px; background: #fafafa; border-radius: 4px;">
+                    <h3>IP归属地查询</h3>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="geoQueryIp" placeholder="输入IP地址" style="flex: 1;">
+                        <button class="btn" onclick="queryGeo()">查询</button>
+                    </div>
+                    <div id="geoQueryResult" style="margin-top: 8px;"></div>
+                </div>
+            </div>
+
+            <!-- URL级策略标签页 -->
+            <div id="tab-url" class="tab-content">
+                <div class="filter-bar" style="margin-bottom: 16px;">
+                    <button class="btn btn-primary" onclick="showUrlRuleModal()">+ 添加URL策略</button>
+                </div>
+                <div id="urlRuleList"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeDetailModal()">关闭</button>
+            <button class="btn btn-primary" onclick="saveDetail()">保存更改</button>
+        </div>
+    </div>
+</div>
+
+<!-- 添加/编辑站点弹窗 -->
+<div class="modal-mask" id="siteModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span id="modalTitle">新增站点</span>
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="siteId">
+            <div class="form-item">
+                <label>站点名称</label>
+                <input type="text" id="siteName" placeholder="如 官网">
+            </div>
+            <div class="form-item">
+                <label>域名</label>
+                <input type="text" id="siteDomain" placeholder="如 www.example.com">
+            </div>
+            <div class="form-item">
+                <label>后端服务地址</label>
+                <input type="text" id="siteBackend" placeholder="如 http://127.0.0.1:8080">
+            </div>
+            <div class="form-item">
+                <label>防护模式</label>
+                <select id="siteMode">
+                    <option value="protection">防护模式（拦截）</option>
+                    <option value="detect">检测模式（仅记录）</option>
+                    <option value="forward">转发模式（关闭防护）</option>
+                </select>
+            </div>
+            <div class="form-item">
+                <label>状态</label>
+                <select id="siteStatus">
+                    <option value="enabled">启用</option>
+                    <option value="disabled">禁用</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveSite()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- URL规则弹窗 -->
+<div class="modal-mask" id="urlRuleModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span id="urlRuleModalTitle">添加URL策略</span>
+            <span class="modal-close" onclick="closeUrlRuleModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="urlRuleId">
+            <div class="form-item">
+                <label>URL路径匹配（正则表达式）</label>
+                <input type="text" id="urlRulePath" placeholder="如 ^/admin/.*">
+            </div>
+            <div class="form-item">
+                <label>规则分类（逗号分隔，留空使用站点默认）</label>
+                <input type="text" id="urlRuleCategories" placeholder="sql_injection,xss,command_injection">
+            </div>
+            <div class="form-item">
+                <label>CC防护速率（请求/分钟，留空使用站点默认）</label>
+                <input type="number" id="urlRuleCcRate" placeholder="60">
+            </div>
+            <div class="switch-label">
+                <label class="switch">
+                    <input type="checkbox" id="urlRuleCcEnabled" checked>
+                    <span class="slider"></span>
+                </label>
+                <span>启用CC防护</span>
+            </div>
+            <div class="switch-label" style="margin-top: 12px;">
+                <label class="switch">
+                    <input type="checkbox" id="urlRuleOverride">
+                    <span class="slider"></span>
+                </label>
+                <span>覆盖站点级配置</span>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeUrlRuleModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveUrlRule()">保存</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentSiteId = null;
+
+const modeNames = {
+    'protection': '防护模式',
+    'detect': '检测模式',
+    'forward': '转发模式'
+};
+
+const categoryNames = {
+    'sql_injection': 'SQL注入',
+    'xss': 'XSS攻击',
+    'command_injection': '命令注入',
+    'directory_traversal': '目录遍历',
+    'file_upload': '恶意上传',
+    'sensitive_path': '敏感路径'
+};
+
+function loadSites() {
+    fetch('/api/sites').then(r => r.json()).then(data => {
+        if (data.code !== 0) return;
+        renderTable(data.data);
+    });
+}
+
+function renderTable(sites) {
+    const tbody = document.getElementById('siteTable');
+    if (sites.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#999;">暂无站点</td></tr>';
+        return;
+    }
+    tbody.innerHTML = sites.map(s => `
+        <tr>
+            <td>${s.id}</td>
+            <td>${s.name}</td>
+            <td>${s.domain}</td>
+            <td>${s.backend_url}</td>
+            <td><span class="tag ${s.mode==='protection'?'tag-high':s.mode==='detect'?'tag-medium':'tag-default'}">${modeNames[s.mode]}</span></td>
+            <td>${s.status==='enabled' ? '<span class="tag tag-success">启用</span>' : '<span class="tag tag-default">禁用</span>'}</td>
+            <td>${s.maintenance_mode ? '<span class="tag tag-danger">维护中</span>' : '<span class="tag tag-success">正常</span>'}</td>
+            <td>
+                <button class="btn btn-sm" onclick="openDetail(${s.id})">详情</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteSite(${s.id}, '${s.name}')">删除</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function showAddModal() {
+    document.getElementById('modalTitle').textContent = '新增站点';
+    document.getElementById('siteId').value = '';
+    document.getElementById('siteName').value = '';
+    document.getElementById('siteDomain').value = '';
+    document.getElementById('siteBackend').value = 'http://httpbin.org';
+    document.getElementById('siteMode').value = 'protection';
+    document.getElementById('siteStatus').value = 'enabled';
+    document.getElementById('siteModal').classList.add('show');
+}
+
+function saveSite() {
+    const id = document.getElementById('siteId').value;
+    const data = {
+        name: document.getElementById('siteName').value,
+        domain: document.getElementById('siteDomain').value,
+        backend_url: document.getElementById('siteBackend').value,
+        mode: document.getElementById('siteMode').value,
+        status: document.getElementById('siteStatus').value
+    };
+    if (!data.name || !data.domain || !data.backend_url) {
+        alert('请填写完整信息'); return;
+    }
+    const url = id ? `/api/sites/${id}` : '/api/sites';
+    const method = id ? 'PUT' : 'POST';
+    fetch(url, {
+        method, headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(d => {
+        if (d.code === 0) { closeModal(); loadSites(); }
+        else { alert(d.msg || '保存失败'); }
+    });
+}
+
+function deleteSite(id, name) {
+    if (!confirm(`确定删除站点 ${name}?`)) return;
+    fetch(`/api/sites/${id}`, {method: 'DELETE'}).then(r => r.json()).then(d => {
+        if (d.code === 0) loadSites();
+    });
+}
+
+function closeModal() { document.getElementById('siteModal').classList.remove('show'); }
+
+// 站点详情相关
+function openDetail(siteId) {
+    currentSiteId = siteId;
+    fetch('/api/sites').then(r => r.json()).then(data => {
+        if (data.code !== 0) return;
+        const site = data.data.find(s => s.id === siteId);
+        if (!site) return;
+
+        document.getElementById('detailSiteId').value = site.id;
+        document.getElementById('detailName').value = site.name;
+        document.getElementById('detailDomain').value = site.domain;
+        document.getElementById('detailBackend').value = site.backend_url;
+        document.getElementById('detailMode').value = site.mode;
+        document.getElementById('maintenanceMode').checked = site.maintenance_mode || false;
+        document.getElementById('maintenanceMessage').value = site.maintenance_message || '';
+        document.getElementById('bypassEnabled').checked = site.bypass_enabled || false;
+        document.getElementById('forceHttps').checked = site.force_https || false;
+
+        updateMaintenanceStatus();
+        loadPorts(siteId);
+        loadGeoRules(siteId);
+        loadUrlRules(siteId);
+
+        document.getElementById('detailModal').classList.add('show');
+    });
+}
+
+function closeDetailModal() { document.getElementById('detailModal').classList.remove('show'); }
+
+function switchTab(tabName) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('tab-' + tabName).classList.add('active');
+}
+
+function updateMaintenanceStatus() {
+    const enabled = document.getElementById('maintenanceMode').checked;
+    document.getElementById('maintenanceStatus').textContent = enabled ? '已开启' : '已关闭';
+    document.getElementById('maintenanceMessageItem').style.display = enabled ? 'block' : 'none';
+}
+
+function toggleMaintenance() {
+    updateMaintenanceStatus();
+    saveDetail();
+}
+
+function toggleBypass() { saveDetail(); }
+function toggleForceHttps() { saveDetail(); }
+
+function saveDetail() {
+    const siteId = document.getElementById('detailSiteId').value;
+    const data = {
+        name: document.getElementById('detailName').value,
+        domain: document.getElementById('detailDomain').value,
+        backend_url: document.getElementById('detailBackend').value,
+        mode: document.getElementById('detailMode').value
+    };
+
+    fetch(`/api/sites/${siteId}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(r => r.json());
+
+    // 保存维护模式
+    fetch(`/api/sites/${siteId}/maintenance`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            enabled: document.getElementById('maintenanceMode').checked,
+            message: document.getElementById('maintenanceMessage').value
+        })
+    }).then(r => r.json());
+}
+
+// 端口管理
+function loadPorts(siteId) {
+    fetch(`/api/sites/${siteId}/ports`).then(r => r.json()).then(data => {
+        if (data.code !== 0) return;
+        const container = document.getElementById('portList');
+        if (data.data.length === 0) {
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:#999;">暂无端口配置</div>';
+            return;
+        }
+        container.innerHTML = data.data.map(p => `
+            <div class="port-item">
+                <strong>${p.port}</strong>
+                <span class="tag ${p.protocol==='https'?'tag-high':'tag-medium'}">${p.protocol}</span>
+                <span class="tag ${p.status==='enabled'?'tag-success':'tag-default'}">${p.status==='enabled'?'启用':'禁用'}</span>
+                <button class="btn btn-sm btn-danger" onclick="removePort(${siteId}, ${p.port}, '${p.protocol}')">&times;</button>
+            </div>
+        `).join('');
+    });
+}
+
+function addPort() {
+    const siteId = document.getElementById('detailSiteId').value;
+    const port = document.getElementById('portNumber').value;
+    const protocol = document.getElementById('portProtocol').value;
+    if (!port) { alert('请输入端口号'); return; }
+
+    fetch(`/api/sites/${siteId}/ports`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({port: parseInt(port), protocol})
+    }).then(r => r.json()).then(d => {
+        if (d.code === 0) {
+            document.getElementById('portNumber').value = '';
+            loadPorts(siteId);
+        }
+    });
+}
+
+function removePort(siteId, port, protocol) {
+    fetch(`/api/sites/${siteId}/ports/${port}?protocol=${protocol}`, {method: 'DELETE'})
+        .then(r => r.json()).then(d => { if (d.code === 0) loadPorts(siteId); });
+}
+
+// 区域访问控制
+function loadGeoRules(siteId) {
+    fetch(`/api/sites/${siteId}/geo-rules`).then(r => r.json()).then(data => {
+        if (data.code !== 0) return;
+        const container = document.getElementById('geoRuleList');
+        if (data.data.length === 0) {
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:#999;">暂无区域访问规则</div>';
+            return;
+        }
+        container.innerHTML = data.data.map(r => `
+            <div class="rule-item">
+                <div class="rule-header">
+                    <span class="tag ${r.rule_type==='blacklist'?'tag-danger':'tag-success'}">
+                        ${r.rule_type==='blacklist'?'黑名单':'白名单'}
+                    </span>
+                    <button class="btn btn-sm btn-danger" onclick="deleteGeoRule(${r.id})">删除</button>
+                </div>
+                <div>
+                    ${r.country_codes.map(c => `<span class="country-tag">${c}</span>`).join('')}
+                </div>
+            </div>
+        `).join('');
+    });
+}
+
+function addGeoRule() {
+    const siteId = document.getElementById('detailSiteId').value;
+    const ruleType = document.getElementById('geoRuleType').value;
+    const countries = document.getElementById('geoCountries').value;
+    if (!countries) { alert('请输入国家代码'); return; }
+
+    const countryCodes = countries.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
+    if (countryCodes.length === 0) { alert('请输入有效的国家代码'); return; }
+
+    fetch(`/api/sites/${siteId}/geo-rules`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({rule_type: ruleType, country_codes: countryCodes})
+    }).then(r => r.json()).then(d => {
+        if (d.code === 0) {
+            document.getElementById('geoCountries').value = '';
+            loadGeoRules(siteId);
+        }
+    });
+}
+
+function deleteGeoRule(ruleId) {
+    if (!confirm('确定删除此规则?')) return;
+    fetch(`/api/geo-rules/${ruleId}`, {method: 'DELETE'})
+        .then(r => r.json()).then(d => { if (d.code === 0) loadGeoRules(currentSiteId); });
+}
+
+function queryGeo() {
+    const ip = document.getElementById('geoQueryIp').value;
+    if (!ip) { alert('请输入IP地址'); return; }
+    fetch(`/api/geo/country/${ip}`).then(r => r.json()).then(data => {
+        if (data.code === 0) {
+            document.getElementById('geoQueryResult').innerHTML =
+                `<span class="tag tag-medium">IP: ${ip}</span> <span class="tag tag-success">所属地区: ${data.data.country}</span>`;
+        }
+    });
+}
+
+// URL级策略
+function loadUrlRules(siteId) {
+    fetch(`/api/sites/${siteId}/url-rules`).then(r => r.json()).then(data => {
+        if (data.code !== 0) return;
+        const container = document.getElementById('urlRuleList');
+        if (data.data.length === 0) {
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:#999;">暂无URL级策略</div>';
+            return;
+        }
+        container.innerHTML = data.data.map(r => `
+            <div class="rule-item">
+                <div class="rule-header">
+                    <code style="background:#f0f0f0;padding:2px 6px;border-radius:3px;">${r.path_pattern}</code>
+                    ${r.override_site_rule ? '<span class="tag tag-danger">覆盖站点配置</span>' : ''}
+                    <button class="btn btn-sm" onclick="editUrlRule(${JSON.stringify(r).replace(/"/g,'&quot;')})">编辑</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteUrlRule(${r.id})">删除</button>
+                </div>
+                <div style="font-size:12px;color:#666;">
+                    规则: ${(r.rule_categories||[]).map(c=>categoryNames[c]||c).join(', ')}
+                    ${r.cc_enabled ? `| CC防护: ${r.cc_rate}次/分钟` : ''}
+                </div>
+            </div>
+        `).join('');
+    });
+}
+
+function showUrlRuleModal() {
+    document.getElementById('urlRuleId').value = '';
+    document.getElementById('urlRulePath').value = '';
+    document.getElementById('urlRuleCategories').value = '';
+    document.getElementById('urlRuleCcRate').value = '';
+    document.getElementById('urlRuleCcEnabled').checked = true;
+    document.getElementById('urlRuleOverride').checked = false;
+    document.getElementById('urlRuleModal').classList.add('show');
+}
+
+function closeUrlRuleModal() { document.getElementById('urlRuleModal').classList.remove('show'); }
+
+function editUrlRule(rule) {
+    document.getElementById('urlRuleId').value = rule.id;
+    document.getElementById('urlRulePath').value = rule.path_pattern;
+    document.getElementById('urlRuleCategories').value = (rule.rule_categories||[]).join(',');
+    document.getElementById('urlRuleCcRate').value = rule.cc_rate;
+    document.getElementById('urlRuleCcEnabled').checked = rule.cc_enabled;
+    document.getElementById('urlRuleOverride').checked = rule.override_site_rule;
+    document.getElementById('urlRuleModal').classList.add('show');
+}
+
+function saveUrlRule() {
+    const siteId = document.getElementById('detailSiteId').value;
+    const ruleId = document.getElementById('urlRuleId').value;
+    const pathPattern = document.getElementById('urlRulePath').value;
+    const categoriesStr = document.getElementById('urlRuleCategories').value;
+    const ccRate = document.getElementById('urlRuleCcRate').value;
+
+    if (!pathPattern) { alert('请输入URL路径匹配规则'); return; }
+
+    const categories = categoriesStr ? categoriesStr.split(',').map(c => c.trim()).filter(c => c) : [];
+
+    const data = {
+        path_pattern: pathPattern,
+        rule_categories: categories,
+        cc_enabled: document.getElementById('urlRuleCcEnabled').checked,
+        cc_rate: ccRate ? parseInt(ccRate) : 60,
+        override_site_rule: document.getElementById('urlRuleOverride').checked
+    };
+
+    const url = ruleId ? `/api/url-rules/${ruleId}` : `/api/sites/${siteId}/url-rules`;
+    const method = ruleId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(d => {
+        if (d.code === 0) {
+            closeUrlRuleModal();
+            loadUrlRules(siteId);
+        }
+    });
+}
+
+function deleteUrlRule(ruleId) {
+    if (!confirm('确定删除此URL策略?')) return;
+    fetch(`/api/url-rules/${ruleId}`, {method: 'DELETE'})
+        .then(r => r.json()).then(d => { if (d.code === 0) loadUrlRules(currentSiteId); });
+}
+
+loadSites();
+</script>
+{% endblock %}
